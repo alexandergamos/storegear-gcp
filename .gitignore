@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Secrets and credentials: never commit
+.env
+.env.*
+*.pem
+*-key.json
+*credentials*.json
+service-account*.json
+
+# Local data
+data/
+*.pdf
+eval/results/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
