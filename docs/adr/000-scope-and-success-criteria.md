@@ -1,6 +1,6 @@
 # ADR-000 — Rebuild StoreGear 100% on Google Cloud: scope and success criteria
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-15)
 - **Date:** 2026-10-15
 - **Linear:** SMO-6
 - **Deciders:** Alexander (decides) · Claude (drafts)
