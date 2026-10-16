@@ -1,0 +1,11 @@
+[project]
+name = "storegear-gcp"
+version = "0.1.0"
+description = "StoreGear Assistant rebuilt on Gemini Enterprise Agent Platform with ADK"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "google-adk>=2.0",
+]
+
+[tool.uv]
+package = false
