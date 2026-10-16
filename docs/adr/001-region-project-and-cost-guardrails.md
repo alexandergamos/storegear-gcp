@@ -1,0 +1,62 @@
+# ADR-001 — Region, project layout and cost guardrails
+
+- **Status:** Accepted (2026-10-16)
+- **Date:** 2026-10-16
+- **Linear:** SMO-7
+- **Deciders:** Alexander (decides) · Claude (drafts)
+
+## Context
+Every Google Cloud resource lives in a **project** (the container for resources, permissions, billing and quotas). A project has **no region of its own**: each resource (database, Cloud Run service, Vertex AI call) picks its location when it is created. So the region has to be a team rule, applied every time.
+
+What matters here:
+- **Model availability:** new Gemini models and Vertex AI features don't reach every region at the same time.
+- **Data residency:** staff chat history is personal data about employees, so GDPR applies. Product manuals are not personal data.
+- **Latency:** Barcelona users; but model time (~2 s per call) dwarfs network distance within Europe.
+- **Cost:** no free credits on this billing account (checked 2026-10-16), so every euro is real.
+
+## Options considered
+
+### Region
+| Option | Pros | Cons |
+|---|---|---|
+| **europe-west1 (Belgium)** | Widest Vertex AI / Gemini coverage in the EU; every service we need; data stays in the EU | ~30–40 ms from Barcelona |
+| europe-southwest1 (Madrid) | Lowest latency | Fewer AI services and later model availability |
+| us-central1 (Iowa) | Models and features land first | Employee data outside the EU (GDPR transfer issues) |
+
+### Project layout
+| Option | Pros | Cons |
+|---|---|---|
+| **One project (`storegear-prod-ag26`)** | Simple; fits a 17-day build | Dev and prod share quotas, IAM and blast radius |
+| One project per environment (dev / prod) | The standard: isolation, safe experiments | Double the setup and IAM work |
+
+### Cost guardrails
+| Option | Pros | Cons |
+|---|---|---|
+| Budget with alerts only | Production style: overspending beats an outage | Nothing stops a runaway loop |
+| **Budget + enforced spend cap** | A hard stop: services pause at the cap | The agent goes down until the cap is lifted or the month resets |
+
+## Decision
+- **Region `europe-west1`** for every resource (Cloud SQL, Cloud Run / Agent Engine, Vertex AI, Secret Manager replication, Artifact Registry).
+- **One project:** `storegear-prod-ag26` (project number 1066603052728). Billing linked.
+- **Budget €30 a month**, with alerts at 50 / 90 / 100 % actual and 100 % forecasted, plus an **enforced spend cap at €30**.
+- **Console first, code-reproducible:** Alexander configures through the Cloud Console to learn. Every step is recorded with its `gcloud` equivalent in `infra/runbook.md`. **Terraform later** (Linear SMO-30).
+
+## Consequences
+- **Good:** the EU region covers the GDPR side and model availability. A hard cap rules out a surprise bill. The runbook keeps the project rebuildable.
+- **Bad / accepted trade-offs:** there's no dev/prod isolation, so experiments run in the production project; mitigate with naming (`-dev` suffixes) and by deleting what isn't used. With the cap, a cost spike becomes an outage. Console clicks aren't reviewable in a PR the way code is.
+- **Caveats:**
+  - Some Gemini models may only be available through the **global** endpoint, which doesn't guarantee that processing stays in the EU. Check model availability in europe-west1 during SMO-9 and record any exception here.
+  - Billing data lags by up to about 24 h, so a cap reacts late to a fast spike.
+  - Enforced caps reset at the start of each month and resume paused services (Google's update, seen in the Console on 2026-10-16).
+  - A new project enables ~50 APIs by default (BigQuery, Compute, Dataplex…). We use only those listed in the runbook.
+  - The billing account also has a Google Maps Platform default budget (€50, 23 services) from another project. Leave it alone.
+
+## Revisit when
+- A second person or a real customer uses the agent: split dev and prod projects and drop the hard cap in favour of alerts plus on-call.
+- A required model is missing in europe-west1.
+- Monthly cost passes about €20 while still idle: review Cloud SQL sizing.
+
+## Learn more
+- Locations for Vertex AI generative AI: https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations
+- Budgets and alerts: https://cloud.google.com/billing/docs/how-to/budgets
+- Resource hierarchy: https://cloud.google.com/resource-manager/docs/cloud-platform-resource-hierarchy
