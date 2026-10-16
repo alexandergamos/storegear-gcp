@@ -25,3 +25,6 @@ eval/results/
 Thumbs.db
 .vscode/
 .idea/
+
+# ADK local dev state (adk web sessions)
+.adk/
