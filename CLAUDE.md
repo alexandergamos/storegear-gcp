@@ -37,4 +37,5 @@ Correctness 5.00 · Faithfulness 4.95 · Context relevance 5.00 · Answer releva
 - A budget alert exists on the project. Eval runs cost money, so run them deliberately.
 
 ## Stack (planned, each piece confirmed by its ADR)
-Python 3.12 + uv · ADK · Gemini on Vertex AI · Cloud SQL Postgres + pgvector · Vertex AI embeddings · Document AI · Cloud Run / Agent Engine · Secret Manager · Cloud Trace / Monitoring · Cloud Build or GitHub Actions.
+Python 3.12 + uv · ADK 2.x · **Gemini Enterprise Agent Platform** (the evolution of Vertex AI since Apr 2026: Gemini models, Agent Runtime, Agent Sessions + Memory Bank, Agent Evaluation, Agent Observability, Agent Identity / Gateway + Model Armor) · Cloud SQL Postgres + pgvector · Document AI · Secret Manager · Cloud Run (alternative runtime) · Cloud Build or GitHub Actions.
+Older docs and URLs still say "Vertex AI" / "Agent Engine": same products, new names. Check the current docs (docs.cloud.google.com/gemini-enterprise-agent-platform) before relying on memory, and check europe-west1 availability in every ADR.
