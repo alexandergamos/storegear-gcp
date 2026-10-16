@@ -51,6 +51,22 @@ What matters here:
   - A new project enables ~50 APIs by default (BigQuery, Compute, Dataplex…). We use only those listed in the runbook.
   - The billing account also has a Google Maps Platform default budget (€50, 23 services) from another project. Leave it alone.
 
+## Addendum (2026-10-16, SMO-9): model endpoint
+Tested with real calls from the project:
+
+| Endpoint | Gemini models served |
+|---|---|
+| `europe-west1` | Only the 2.5 family (2.5 Flash, 2.5 Flash-Lite, 2.5 Pro, TTS, Live) |
+| `global` | All of them, including 3.x (3.5, 3.6, 3.7, **3.8 Flash**) and `gemini-embedding-2`. **No guarantee where ML processing happens** |
+| `eu` (jurisdictional multi-region) | **`gemini-3.8-flash` works**; `gemini-2.5-flash` doesn't |
+
+**Decision (Alexander):** model calls go through the **`eu`** endpoint with **`gemini-3.8-flash`**, the same model as the n8n baseline. That keeps the eval comparison fair: one change (the architecture), not two. All *resources* (Cloud SQL, runtime, secrets, registry) stay in **`europe-west1`**.
+
+- **Why:** Google's data-residency docs say ML processing on jurisdictional endpoints stays within that jurisdiction (the EU). Regional endpoints not listed in the tables carry no processing guarantee.
+- **Caveat to check:** the model-by-location table didn't render fully, so 3.8 Flash's EU guarantee is confirmed by a working call, not yet by the table. Check it in the console docs before any real users arrive. `eu` can process anywhere in the EU, not only in Belgium.
+- **Alternative kept:** `gemini-2.5-flash` on `europe-west1` (strictest residency, older model).
+- **Open for SMO-11:** the embedding model. `gemini-embedding-2` showed up on `global`; check `eu` / `europe-west1` before re-embedding.
+
 ## Revisit when
 - A second person or a real customer uses the agent: split dev and prod projects and drop the hard cap in favour of alerts plus on-call.
 - A required model is missing in europe-west1.

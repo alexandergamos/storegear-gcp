@@ -28,7 +28,7 @@ def get_store_hours(city: str) -> dict:
 
 root_agent = Agent(
     name="hello_agent",
-    model=os.getenv("STOREGEAR_MODEL", "gemini-2.5-flash"),
+    model=os.getenv("STOREGEAR_MODEL", "gemini-3.8-flash"),
     description="Smoke test: answers opening-hours questions with one tool.",
     instruction=(
         "You are a shop assistant. When asked about opening hours, call get_store_hours. "

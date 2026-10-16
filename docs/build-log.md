@@ -7,6 +7,7 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 | 1 | 2026-10-15 | SMO-6 | Repo, ADR process and project docs |
 | 2 | 2026-10-16 | SMO-7 | Google Cloud project, budget and APIs |
 | 3 | 2026-10-16 | SMO-8 | Service accounts, least privilege, no keys |
+| 4 | 2026-10-16 | SMO-9 | Toolchain, ADK hello world, model endpoint decision |
 
 ---
 
@@ -55,5 +56,21 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Por qué:** en n8n las claves vivían en un gestor de credenciales. En Google Cloud el código tiene una identidad propia y Google emite tokens de corta duración, así que no hay nada que se pueda filtrar.
 - **Aprendido:** la cuenta de servicio de Compute por defecto trae **Editor** sobre todo el proyecto. Es el valor por defecto de Google y un antipatrón conocido, así que nunca la usamos. Además, Vertex AI ahora es **Gemini Enterprise Agent Platform** (abril 2026). Agent Runtime, Sessions/Memory Bank, Evaluation, Observability y Agent Identity ya vienen incluidos, así que varias tareas de Linear pasan de "construir" a "configurar". Lo detectó Alexander al revisar la documentación actual.
 - **Siguiente:** SMO-9, herramientas locales y un hola mundo con ADK sobre Agent Platform.
+
+---
+
+## 4 · Toolchain, ADK hello world, model endpoint decision (SMO-9) — 2026-10-16
+
+### EN
+- **What:** uv + Python 3.12 + ADK 2.12. A `hello_agent` with one tool runs in `adk web`, on Agent Platform with Alexander's Google login (no API key). Tested: tool call → result → answer in English and Spanish, including the "not found" case. ADR-003 (ADK) accepted.
+- **Why:** in n8n, the AI Agent node hid the loop. In ADK the loop is visible event by event, and a tool is just a Python function whose docstring becomes the tool description.
+- **Learned:** **regions decide which models you get.** `europe-west1` serves only Gemini 2.5. Gemini 3.x (including 3.8 Flash, the n8n model) is only on `global` or the EU jurisdictional endpoint `eu`. We chose `eu` + 3.8 Flash: same model as the baseline, processing inside the EU. Also: winget installed uv without adding it to PATH, and `.env` is only read when `adk web` starts.
+- **Next:** SMO-10, the vector store ADR and provisioning Cloud SQL + pgvector.
+
+### ES
+- **Qué:** uv + Python 3.12 + ADK 2.12. Un `hello_agent` con una herramienta funciona en `adk web`, sobre Agent Platform con el login de Google de Alexander (sin API key). Probado: llamada a la herramienta → resultado → respuesta en inglés y en español, incluido el caso "no encontrado". ADR-003 (ADK) aceptado.
+- **Por qué:** en n8n el nodo AI Agent escondía el bucle. En ADK el bucle se ve evento a evento, y una herramienta es solo una función de Python cuyo docstring se convierte en la descripción que lee el modelo.
+- **Aprendido:** **la región decide qué modelos tienes.** `europe-west1` solo sirve Gemini 2.5. Gemini 3.x (incluido 3.8 Flash, el modelo de n8n) solo está en `global` o en el endpoint jurisdiccional de la UE, `eu`. Elegimos `eu` + 3.8 Flash: el mismo modelo que la línea base y el procesamiento dentro de la UE. Además: winget instaló uv sin añadirlo al PATH, y el `.env` solo se lee al arrancar `adk web`.
+- **Siguiente:** SMO-10, ADR del almacén vectorial y Cloud SQL + pgvector.
 
 ---
