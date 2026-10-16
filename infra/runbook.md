@@ -51,3 +51,41 @@ gcloud services enable aiplatform.googleapis.com secretmanager.googleapis.com \
 gcloud services list --enabled --project $PROJECT_ID
 ```
 Later phases add `documentai.googleapis.com` (Phase 2), `cloudscheduler.googleapis.com`, and `drive.googleapis.com` / `sheets.googleapis.com` for the tools.
+
+## SMO-8 · Service accounts and IAM (2026-10-16, Console; ADR-002)
+
+**1. Service accounts**
+```bash
+gcloud iam service-accounts create sg-agent --display-name="StoreGear agent runtime" --project $PROJECT_ID
+gcloud iam service-accounts create sg-ingestion --display-name="StoreGear ingestion job" --project $PROJECT_ID
+```
+
+**2. Project roles** (no Owner or Editor, ever)
+```bash
+for R in aiplatform.user cloudsql.client cloudsql.instanceUser logging.logWriter monitoring.metricWriter cloudtrace.agent; do
+  gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:sg-agent@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/$R" --condition=None
+done
+for R in aiplatform.user cloudsql.client cloudsql.instanceUser logging.logWriter; do
+  gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:sg-ingestion@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/$R" --condition=None
+done
+```
+Secret access is granted per secret when each secret is created, never at project level:
+```bash
+gcloud secrets add-iam-policy-binding <SECRET> --member="serviceAccount:sg-agent@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/secretmanager.secretAccessor"
+```
+
+**3. Let Alexander impersonate the SAs** (to test with exactly their permissions)
+```bash
+for SA in sg-agent sg-ingestion; do
+  gcloud iam service-accounts add-iam-policy-binding $SA@$PROJECT_ID.iam.gserviceaccount.com \
+    --member="user:<admin-email>" --role="roles/iam.serviceAccountTokenCreator"
+done
+```
+
+**4. Local credentials** (ADC; no key files)
+```bash
+gcloud auth application-default login
+gcloud auth application-default set-quota-project $PROJECT_ID
+```
