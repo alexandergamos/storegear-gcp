@@ -89,3 +89,36 @@ done
 gcloud auth application-default login
 gcloud auth application-default set-quota-project $PROJECT_ID
 ```
+
+## SMO-10 · Cloud SQL Postgres + pgvector (2026-10-16, Console; ADR-004)
+
+**1. Admin password → Secret Manager** (generated in the Console; never in chat or files)
+```bash
+gcloud secrets create sg-db-postgres-password --replication-policy=user-managed --locations=$REGION
+printf '%s' "<PASTE>" | gcloud secrets versions add sg-db-postgres-password --data-file=-
+```
+
+**2. Instance**
+```bash
+gcloud sql instances create sg-catalog --database-version=POSTGRES_17 --edition=ENTERPRISE \
+  --tier=db-f1-micro --region=$REGION --availability-type=ZONAL \
+  --storage-type=SSD --storage-size=10 --storage-auto-increase \
+  --backup --backup-start-time=02:00 --retained-backups-count=7 \
+  --assign-ip --authorized-networks="" --deletion-protection \
+  --database-flags=cloudsql.iam_authentication=on \
+  --root-password="$(gcloud secrets versions access latest --secret=sg-db-postgres-password)"
+gcloud sql databases create storegear --instance=sg-catalog
+```
+
+**3. IAM database users** (no passwords; ADR-002)
+```bash
+gcloud sql users create sg-agent@$PROJECT_ID.iam --instance=sg-catalog --type=cloud_iam_service_account
+gcloud sql users create sg-ingestion@$PROJECT_ID.iam --instance=sg-catalog --type=cloud_iam_service_account
+gcloud sql users create <admin-email> --instance=sg-catalog --type=cloud_iam_user
+```
+
+**4. Stop / start** (cost lever: stopped = storage only)
+```bash
+gcloud sql instances patch sg-catalog --activation-policy=NEVER    # stop
+gcloud sql instances patch sg-catalog --activation-policy=ALWAYS   # start
+```

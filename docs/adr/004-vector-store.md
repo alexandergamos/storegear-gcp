@@ -1,6 +1,6 @@
 # ADR-004 — Vector store: Cloud SQL for PostgreSQL + pgvector
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-16)
 - **Date:** 2026-10-16
 - **Linear:** SMO-10
 - **Deciders:** Alexander (decides) · Claude (drafts)
@@ -24,7 +24,7 @@ The 2026-10-08 comparison in n8n already found that Pinecone hybrid, Qdrant and 
 | Vector Search 2.0 (Agent Platform) | Fully managed vector database with built-in text search and hybrid RRF | No database to run; scales to billions; optional auto-embeddings | Keyword-search language support (Spanish stemming) not documented in what we found; the IDF weighting, 2-term rule and parent-level RRF would need rework; release status of hybrid unclear | Not confirmed |
 | RAG Engine (Agent Platform) | Managed end-to-end RAG: ingest, chunk, embed, retrieve | Least code | Gives up our chunking, injection check, role filter and RRF, so the eval comparison loses its meaning; the least learning | Not confirmed |
 
-## Decision (proposed)
+## Decision
 **Cloud SQL for PostgreSQL (Enterprise edition, latest supported major version) with pgvector**, in `europe-west1`:
 - **Size:** shared-core **db-f1-micro** (0.6 GB RAM), single zone (no HA), 10 GB SSD, daily automated backups (7 kept). It's enough for ~10k chunks: the vectors fit in memory, and even a full scan is milliseconds at this size. Upgrade to db-g1-small only if p50 search latency is worse than n8n's 1.3 s.
 - **Connectivity:** public IP **with no authorized networks**, so it's reachable **only through the Cloud SQL connectors** (TLS plus IAM checks). This avoids building a private network (VPC) for now.
