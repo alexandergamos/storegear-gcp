@@ -1,6 +1,6 @@
 # Progress summary
 
-*Updated 2026-10-17 (after SMO-12). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
+*Updated 2026-10-17 (after SMO-13). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
 
 ## In one paragraph
 We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and its tables, Spanish search and permissions are live. The catalog is loaded: 9,054 passages from 10 manuals, each with a Google embedding.
@@ -46,10 +46,18 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 - **What we learned by measuring:** only 2–3 % of passages name their product, so we now embed the section header *with* the text (contextual embeddings). That took right-manual-first from 15/17 to 17/17.
 - **Honest gap:** comparison questions ("A vs B") need one search per product. The agent will do that (SMO-13), and the eval checks it (SMO-14).
 
+### 8. The StoreGear agent (SMO-13 · ADR-006)
+- **What:** the real agent in ADK (`agent/storegear/`). Your n8n system prompt is copied word for word (rules 1–12). Two read-only tools: the hybrid search and **live price/stock from your Google Sheet**, which is shared with the robot as Viewer. **Pre-retrieval** searches before the first model call, as in n8n. The model is Gemini 3.8 Flash with low thinking.
+- **First answers, run as the robot:** spec ✅ · comparison ✅ (it searched the second product on its own, closing the gap from SMO-12) · price 229 € / 7 in stock ✅ · out of catalog "no tengo esa información" ✅ · ambiguous "el Garmin" → asks which model ✅.
+- **Where the prompt lives:** a file in git, reviewed with the code and gated by the eval, instead of Langfuse (a third-party service).
+- **To watch:** latency 5–23 s locally and cold; measured properly in SMO-14 and SMO-15.
+- **Try it yourself:** `uv run python agent/ask.py "tu pregunta"` shows every step and its timing.
+
 ## What's next
 | Next | Issue | What happens |
 |---|---|---|
-| 1 | SMO-13 / 14 / 15 | Real StoreGear agent → 22-question eval → deploy. That completes Phase 1 (due 21 Oct) |
+| 1 | SMO-14 | Port the 22-question eval with the LLM judges (correctness + RAG triad) and compare against n8n |
+| 2 | SMO-15 | Deploy to Agent Runtime (or Cloud Run) and measure latency and cost. That completes Phase 1 (due 21 Oct) |
 
 ## Numbers to beat (n8n, 2026-10-11)
 Correctness 5.00 · Faithfulness 4.95 · Context 5.00 · Answer 5.00 · median 9.0 s · ~$0.008 per answer.

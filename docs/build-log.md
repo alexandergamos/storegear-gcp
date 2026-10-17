@@ -11,6 +11,7 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 | 5 | 2026-10-17 | SMO-10 | Vector store: Cloud SQL free trial, schema, least privilege |
 | 6 | 2026-10-17 | SMO-11 | Catalog export, embedding benchmark, load |
 | 7 | 2026-10-17 | SMO-12 | Hybrid search tool, contextual embeddings |
+| 8 | 2026-10-17 | SMO-13 | The StoreGear agent: prompt, tools, pre-retrieval |
 
 ---
 
@@ -123,5 +124,21 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Por qué:** la recuperación es la mitad de la calidad de la respuesta, y es más barato arreglarla aquí que en el eval.
 - **Aprendido:** medir, mirar los fallos y arreglar la causa. La primera ejecución dio 15/17: se confundían manuales hermanos de Polar porque solo el 2-3 % de los chunks nombran su producto. Embeber `header_path + chunk_text` (embeddings contextuales) lo subió a 17/17. Un límite de diversidad por manual no arregló la pregunta de comparación, porque la sección correcta ni siquiera se recuperaba. Las comparaciones necesitan una búsqueda por producto, y eso es tarea del agente.
 - **Siguiente:** SMO-13, el agente de StoreGear (prompt, herramientas, búsqueda previa).
+
+---
+
+## 8 · The StoreGear agent: prompt, tools, pre-retrieval (SMO-13) — 2026-10-17
+
+### EN
+- **What:** ADK agent `storegear`. The n8n system prompt is copied verbatim into git. Tools: `buscar_catalogo_hibrido` and `consultar_precio_stock` (live Google Sheet, shared with sg-agent as Viewer, Sheets API enabled). Pre-retrieval runs as a `before_model_callback`, once per turn. The role comes from session state only. Model: gemini-3.8-flash, thinking low. Spot checks as sg-agent: Q1, Q16, Q18, Q19 and Q20 all behave like n8n. ADR-006 accepted.
+- **Why:** behavioural parity first, then measure (SMO-14).
+- **Learned:** the comparison question that failed the retrieval benchmark is solved by agent behaviour. The model saw the pre-search covered one product and searched the other. Retrieval benchmarks and agent evals measure different things. Price answers cost two model calls plus a Sheet read (~23 s cold), so latency is the next thing to measure.
+- **Next:** SMO-14, the 22-question eval with LLM judges.
+
+### ES
+- **Qué:** agente de ADK `storegear`. El prompt de sistema de n8n, copiado literal en git. Herramientas: `buscar_catalogo_hibrido` y `consultar_precio_stock` (Google Sheet en vivo, compartida con sg-agent como lector, Sheets API activada). La búsqueda previa funciona como `before_model_callback`, una vez por turno. El rol sale solo del estado de la sesión. Modelo: gemini-3.8-flash con razonamiento bajo. Pruebas como sg-agent: Q1, Q16, Q18, Q19 y Q20 se comportan como en n8n. ADR-006 aceptado.
+- **Por qué:** primero paridad de comportamiento, después medir (SMO-14).
+- **Aprendido:** la pregunta de comparación que fallaba en la prueba de recuperación la resuelve el comportamiento del agente. El modelo vio que la búsqueda previa cubría un solo producto y buscó el otro. Las pruebas de recuperación y los evals del agente miden cosas distintas. Las respuestas de precio cuestan dos llamadas al modelo más una lectura de la hoja (~23 s en frío), así que la latencia es lo siguiente que hay que medir.
+- **Siguiente:** SMO-14, el eval de 22 preguntas con jueces LLM.
 
 ---

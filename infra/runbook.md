@@ -144,3 +144,8 @@ uv run python ingestion/load_catalog.py gemini-embedding-2       # as sg-ingesti
 $env:STOREGEAR_IMPERSONATE_SA="sg-agent@storegear-prod-ag26.iam.gserviceaccount.com"   # run AS the agent
 uv run python eval/hybrid_benchmark.py
 ```
+
+## SMO-13 · Agent prerequisites (2026-10-17, Console)
+- Enable **Google Sheets API**: `gcloud services enable sheets.googleapis.com --project $PROJECT_ID`
+- Share the **StoreGear** sheet (`1KnKC0iFDCzChg9szTkDazkwmgqQGQpbDg2raZ0EI2m4`) with `sg-agent@$PROJECT_ID.iam.gserviceaccount.com` as **Viewer** (Drive sharing, not IAM).
+- Try the agent: `copy agent/storegear/.env.example agent/storegear/.env`, then `uv run python agent/ask.py "pregunta"` or `cd agent; uv run adk web`.

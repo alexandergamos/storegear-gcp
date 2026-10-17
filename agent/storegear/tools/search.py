@@ -192,7 +192,8 @@ def format_for_agent(rows: list[dict]) -> str:
         src = (r["file_name"] or "").replace('"', "")
         sec = (r["header_path"] or "").replace('"', "")
         body = _TAG.sub("[etiqueta eliminada]", r["parent_context"] or "")
-        parts.append(f'<manual fuente="{src}" seccion="{sec}">\n{body}\n</manual>')
+        file_id = (r["parent_id"] or "").split("::", 1)[0]  # Drive fileId: key for consultar_precio_stock
+        parts.append(f'<manual fuente="{src}" seccion="{sec}" fileId="{file_id}">\n{body}\n</manual>')
     return "\n\n".join(parts)
 
 

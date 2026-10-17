@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const UPDATED = '2026-10-17';
-const HEADLINE = 'Phase 0 done · Phase 1: hybrid search tool live (SMO-12) · next SMO-13 the StoreGear agent';
+const HEADLINE = 'Phase 0 done · Phase 1: StoreGear agent answers like n8n (SMO-13) · next SMO-14 the 22-question eval';
 
 // ---------------------------------------------------------------- content (edit statuses here)
 const LAPTOP = [
@@ -40,8 +40,8 @@ const GCP = [ // [title, items]
   ]],
   ['Agent code', [
     ['done', 'Hybrid search · 17/17 · 0.6 s'],
-    ['wip', 'StoreGear agent (SMO-13)'],
-    ['todo', 'Eval harness (SMO-14)'],
+    ['done', 'StoreGear agent · rules 1-12'],
+    ['wip', 'Eval harness (SMO-14)'],
   ]],
   ['Ingestion pipeline', [
     ['todo', 'Document AI parse (SMO-16)'],
@@ -51,7 +51,7 @@ const GCP = [ // [title, items]
 ];
 const SOURCES = [
   ['done', 'n8n catalog export ✓'],
-  ['todo', 'Price/stock Sheet (SMO-13)'],
+  ['done', 'Price/stock Sheet · live'],
   ['todo', 'Drive manuals (SMO-20)'],
   ['todo', 'n8n baseline · 22 q (SMO-14)'],
 ];
