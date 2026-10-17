@@ -130,3 +130,11 @@ uv run python infra/sql/inspect_schema.py                   # versions, indexes,
 uv run python infra/sql/check_access.py                     # least-privilege proof via impersonation
 ```
 Expected access: everyone reads; only `sg-ingestion` writes; `sg-agent` and Alexander get "permission denied" on writes.
+
+## SMO-11 · Catalog load (2026-10-17; ADR-005)
+Inputs: `data/catalog_chunks.csv`, `data/catalog_parents.csv` (exported from n8n's Supabase Table Editor; git-ignored).
+```bash
+uv run python ingestion/embed_export.py gemini-embedding-2       # ~5 min, one text per call (eu endpoint)
+uv run python eval/retrieval_benchmark.py gemini-embedding-2     # manual@1 / manual@5 / MRR on 17 questions
+uv run python ingestion/load_catalog.py gemini-embedding-2       # as sg-ingestion (impersonation); idempotent upsert
+```

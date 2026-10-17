@@ -9,6 +9,7 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 | 3 | 2026-10-16 | SMO-8 | Service accounts, least privilege, no keys |
 | 4 | 2026-10-16 | SMO-9 | Toolchain, ADK hello world, model endpoint decision |
 | 5 | 2026-10-17 | SMO-10 | Vector store: Cloud SQL free trial, schema, least privilege |
+| 6 | 2026-10-17 | SMO-11 | Catalog export, embedding benchmark, load |
 
 ---
 
@@ -89,5 +90,21 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Por qué:** el mismo motor y la misma consulta que la línea base, así que la comparación es justa. La prueba gratuita cubre el plazo y libera presupuesto para los modelos.
 - **Aprendido:** el mínimo privilegio se prueba, no se supone. Conectando *como* cada robot mediante suplantación: `sg-agent` puede leer y se le deniega escribir; `sg-ingestion` puede escribir. La prueba gratuita nunca cobra sola (se para a los 30 días), pero "Upgrade" costaría cientos de euros al mes. El stemming en español convierte "baterías" en `bat`. Pequeño bug detectado: nuestro separador de SQL se saltaba sentencias con comentarios al final de línea, así que hay que verificar después de cada migración.
 - **Siguiente:** SMO-11, exportar el catálogo de n8n, elegir el modelo de embeddings de Google y cargarlo.
+
+---
+
+## 6 · Catalog export, embedding benchmark, load (SMO-11) — 2026-10-17
+
+### EN
+- **What:** Alexander exported `catalog_chunks` (9,054) and `catalog_parents` (1,171) from Supabase. We confirmed n8n's Spanish search column is identical to ours. Two Google models embedded the whole catalog and were compared on the 17 eval questions with a known manual. Winner: `gemini-embedding-2`, right manual first 16/17 vs 13/17 for `gemini-embedding-001`, and in the top 5 for 17/17 with both. It was loaded as `sg-ingestion` in 58 s, with 0 orphans. The eval dataset (22 questions) now lives in the repo.
+- **Why:** choose by measuring on our own data. Retrieval quality is the foundation of the 5.00 baseline.
+- **Learned:** ⚠️ `gemini-embedding-2` returns ONE vector for a list of texts. Batching would have silently merged passages, with no error. Now there's an explicit count check. Also: each embedding model lives on a different endpoint (`001` in europe-west1, `2` only on `eu`).
+- **Next:** SMO-12, port the one-query hybrid search as an ADK tool and repeat the 18/18 retrieval check.
+
+### ES
+- **Qué:** Alexander exportó `catalog_chunks` (9.054) y `catalog_parents` (1.171) desde Supabase. Confirmamos que la columna de búsqueda en español de n8n es idéntica a la nuestra. Dos modelos de Google embebieron todo el catálogo y los comparamos con las 17 preguntas del eval que tienen manual conocido. Ganador: `gemini-embedding-2`, manual correcto en primer lugar 16/17 frente a 13/17 de `gemini-embedding-001`, y en el top 5 17/17 con los dos. Se cargó como `sg-ingestion` en 58 s, con 0 huérfanos. El dataset del eval (22 preguntas) ya está en el repo.
+- **Por qué:** elegir midiendo con nuestros propios datos. La calidad de la recuperación es la base de la puntuación de 5.00.
+- **Aprendido:** ⚠️ `gemini-embedding-2` devuelve UN vector para una lista de textos. Mandar lotes habría fusionado pasajes en silencio, sin ningún error. Ahora hay una comprobación explícita del número de vectores. Además, cada modelo de embeddings vive en un endpoint distinto (`001` en europe-west1, `2` solo en `eu`).
+- **Siguiente:** SMO-12, portar la búsqueda híbrida de una sola consulta como herramienta de ADK y repetir la prueba de recuperación 18/18.
 
 ---

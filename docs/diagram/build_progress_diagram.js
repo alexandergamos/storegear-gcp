@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const UPDATED = '2026-10-17';
-const HEADLINE = 'Phase 0 done · Phase 1 in progress (SMO-10 done: catalog schema live; next SMO-11: load + re-embed)';
+const HEADLINE = 'Phase 0 done · Phase 1: catalog loaded (SMO-11) · next SMO-12 hybrid search tool';
 
 // ---------------------------------------------------------------- content (edit statuses here)
 const LAPTOP = [
@@ -36,10 +36,10 @@ const GCP = [ // [title, items]
   ['Data · Cloud SQL', [
     ['done', 'sg-catalog · PG18 · free trial'],
     ['done', 'Schema + least privilege'],
-    ['wip', 'Re-embed catalog (SMO-11)'],
+    ['done', '9,054 chunks · gemini-emb-2'],
   ]],
   ['Agent code', [
-    ['todo', 'Hybrid search tool (SMO-12)'],
+    ['wip', 'Hybrid search tool (SMO-12)'],
     ['todo', 'StoreGear agent (SMO-13)'],
     ['todo', 'Eval harness (SMO-14)'],
   ]],
@@ -50,7 +50,7 @@ const GCP = [ // [title, items]
   ]],
 ];
 const SOURCES = [
-  ['wip', 'n8n catalog export (SMO-11)'],
+  ['done', 'n8n catalog export ✓'],
   ['todo', 'Price/stock Sheet (SMO-13)'],
   ['todo', 'Drive manuals (SMO-20)'],
   ['todo', 'n8n baseline · 22 q (SMO-14)'],
@@ -131,8 +131,8 @@ SOURCES.forEach((it, i) => item(1315, TOP + 55 + i * 85, 230, 60, it, 14));
 // connectors
 arrow(325, TOP + 290, 50, 0, { color: '#2f9e44' });
 text(320, TOP + 262, 60, 'ADC ✓', { fontSize: 13, color: '#2f9e44' });
-arrow(1295, TOP + 440, -50, 0, { color: '#868e96', dash: 'dashed' });
-text(1240, TOP + 412, 60, 'SMO-11', { fontSize: 13, color: '#868e96' });
+arrow(1295, TOP + 440, -50, 0, { color: '#2f9e44' });
+text(1240, TOP + 412, 60, 'loaded ✓', { fontSize: 13, color: '#2f9e44' });
 
 // timeline
 text(40, TOP + H + 30, 600, 'Timeline (deadline 31 Oct)', { fontSize: 20, textAlign: 'left' });

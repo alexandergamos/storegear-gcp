@@ -1,9 +1,9 @@
 # Progress summary
 
-*Updated 2026-10-17 (after SMO-10). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
+*Updated 2026-10-17 (after SMO-11). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
 
 ## In one paragraph
-We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and its tables, Spanish search and permissions are live. Next we load the catalog.
+We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and its tables, Spanish search and permissions are live. The catalog is loaded: 9,054 passages from 10 manuals, each with a Google embedding.
 
 ## What we built, layer by layer
 
@@ -35,12 +35,16 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 - **Least privilege, proven:** connecting *as* each robot, everyone can read, only `sg-ingestion` can write, and `sg-agent` gets "permission denied". A tricked agent can't alter the catalog.
 - ⚠️ **Never click "Upgrade"** on the trial. It ends around 16 November by stopping; it never starts charging. Reminder set for 10 November.
 
+### 6. The catalog and the embedding model (SMO-11 · ADR-005)
+- **What:** you exported the two tables from n8n's Supabase. We re-embedded every passage with Google and loaded it into Cloud SQL as `sg-ingestion`, the only identity allowed to write. Result: 9,054 chunks, 1,171 sections, 0 orphans.
+- **How we chose the model:** a benchmark, not a guess. Both candidate models embedded the full catalog, then we checked the 17 eval questions: is the right manual first? **`gemini-embedding-2`: 16/17. `gemini-embedding-001`: 13/17** (it mixes up sibling Polar manuals).
+- **Gotcha worth remembering:** `gemini-embedding-2` returns *one* vector for a *list* of texts. Sending batches would have silently merged passages and ruined search. The script now checks this and fails loudly.
+
 ## What's next
 | Next | Issue | What happens |
 |---|---|---|
-| 1 | SMO-11 | Export the catalog from n8n, re-embed it with a Google embedding model, load it |
-| 2 | SMO-12 | Port the hybrid search query as an agent tool; retrieval test must stay at 18/18 |
-| 3 | SMO-13 / 14 / 15 | Real StoreGear agent → 22-question eval → deploy. That completes Phase 1 (due 21 Oct) |
+| 1 | SMO-12 | Port the hybrid search query as an agent tool; retrieval test must stay at 18/18 |
+| 2 | SMO-13 / 14 / 15 | Real StoreGear agent → 22-question eval → deploy. That completes Phase 1 (due 21 Oct) |
 
 ## Numbers to beat (n8n, 2026-10-11)
 Correctness 5.00 · Faithfulness 4.95 · Context 5.00 · Answer 5.00 · median 9.0 s · ~$0.008 per answer.
