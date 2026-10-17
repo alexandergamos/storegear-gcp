@@ -47,6 +47,17 @@ The 2026-10-08 comparison in n8n already found that Pinecone hybrid, Qdrant and 
   - IAM DB users need explicit `GRANT`s on tables.
   - Committed-use discounts don't apply to shared-core instances.
 
+## Addendum (2026-10-17): Cloud SQL free trial instance
+Alexander found and created a **Cloud SQL 30-day free trial instance** instead of the paid db-f1-micro: `sg-catalog`, created 2026-10-17, **Enterprise Plus, db-perf-optimized-N-8 (8 vCPU, 64 GB RAM, 375 GB data cache), 100 GB SSD, PostgreSQL 18**, europe-west1, single zone. The IAM authentication flag is on, public IP has no authorized networks, and there is no deletion protection.
+
+- **Cost:** €0 for the instance during the trial. Data transfer outside the region and a final backup are still billable. This frees the €30 budget for models and embeddings.
+- **Timeline:** the trial ends around **2026-11-16**, two weeks after the 31-10 deadline. After that, the instance **stops serving** and is kept stopped for 90 days, then deleted. **It does not start charging by itself.**
+- **Never click "Upgrade":** it would turn into a paid Enterprise Plus instance costing several hundred euros a month (the spend cap would then pause it).
+- **Trade-offs:** free trial instances support **no backups or restore** and **no SLA**. Accepted, because the catalog can be rebuilt from the n8n export or by re-running ingestion.
+- **Benchmark caveat:** this machine is far stronger than db-f1-micro, so the latency results will flatter the Google Cloud build. The comparison report (SMO-29) must say so, and quote db-f1-micro as the real-world cost option.
+- **After the trial:** if the system should keep running, create the db-f1-micro instance from the main decision and re-load it (export/import or re-ingest). Decide by 2026-11-10.
+- "Stop when idle" doesn't apply during the trial, since the instance is free either way.
+
 ## Revisit when
 - More than ~100k chunks, or p95 search over 1 s: move to db-g1-small or a dedicated core, then consider AlloyDB.
 - Real users: add HA, private IP and point-in-time recovery.
