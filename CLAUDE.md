@@ -22,6 +22,7 @@ The reference implementation is the n8n repo `C:\Users\alexg\GitHub\smoothr-stor
 - **Teach while building:** explain the why, not just the what. Name the concept, the alternative, the trade-off, and what would make us choose differently. Point to the official docs.
 - **Alexander runs infrastructure steps himself** (gcloud, IAM, deploys, console). Give him the commands with an explanation; don't run them silently. Claude Code writes most of the application code, and Alexander reviews it.
 - **Ask before deciding:** when there are real options, give a multiple choice with a recommended option.
+- **Progress diagram:** after closing an issue, update its status in `docs/diagram/build_progress_diagram.js`, regenerate (`node docs/diagram/build_progress_diagram.js`, then `render_png.js` for the PNG) and refresh `docs/progress.md`.
 - **Eval gate:** every phase ends with the 22-question eval against the n8n baseline. A phase isn't done until the eval passes.
 - **Keep it simple:** production-grade but no gold-plating. If time runs out, stop at the last green phase.
 
