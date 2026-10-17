@@ -122,3 +122,11 @@ gcloud sql users create <admin-email> --instance=sg-catalog --type=cloud_iam_use
 gcloud sql instances patch sg-catalog --activation-policy=NEVER    # stop
 gcloud sql instances patch sg-catalog --activation-policy=ALWAYS   # start
 ```
+
+**5. Schema** (code, not Console: `infra/sql/`)
+```bash
+uv run python infra/sql/apply.py infra/sql/001_schema.sql   # as postgres; password read from Secret Manager, never printed
+uv run python infra/sql/inspect_schema.py                   # versions, indexes, Spanish FTS sample
+uv run python infra/sql/check_access.py                     # least-privilege proof via impersonation
+```
+Expected access: everyone reads; only `sg-ingestion` writes; `sg-agent` and Alexander get "permission denied" on writes.

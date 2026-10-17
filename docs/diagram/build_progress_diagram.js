@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const UPDATED = '2026-10-17';
-const HEADLINE = 'Phase 0 done · Phase 1 in progress (SMO-10: database ready, schema next)';
+const HEADLINE = 'Phase 0 done · Phase 1 in progress (SMO-10 done: catalog schema live; next SMO-11: load + re-embed)';
 
 // ---------------------------------------------------------------- content (edit statuses here)
 const LAPTOP = [
@@ -15,7 +15,7 @@ const LAPTOP = [
   ['done', 'hello_agent in adk web'],
   ['done', "gcloud profile 'storegear'"],
   ['done', 'ADC login (no key files)'],
-  ['done', 'Repo · 5 ADRs · runbook'],
+  ['done', 'Repo · ADRs · runbook · SQL'],
 ];
 const GCP = [ // [title, items]
   ['Cost guardrails', [
@@ -35,8 +35,8 @@ const GCP = [ // [title, items]
   ]],
   ['Data · Cloud SQL', [
     ['done', 'sg-catalog · PG18 · free trial'],
-    ['wip', 'pgvector schema (SMO-10)'],
-    ['todo', 'Re-embed catalog (SMO-11)'],
+    ['done', 'Schema + least privilege'],
+    ['wip', 'Re-embed catalog (SMO-11)'],
   ]],
   ['Agent code', [
     ['todo', 'Hybrid search tool (SMO-12)'],
@@ -50,7 +50,7 @@ const GCP = [ // [title, items]
   ]],
 ];
 const SOURCES = [
-  ['todo', 'n8n catalog export (SMO-11)'],
+  ['wip', 'n8n catalog export (SMO-11)'],
   ['todo', 'Price/stock Sheet (SMO-13)'],
   ['todo', 'Drive manuals (SMO-20)'],
   ['todo', 'n8n baseline · 22 q (SMO-14)'],

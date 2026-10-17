@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "StoreGear Assistant rebuilt on Gemini Enterprise Agent Platform with ADK"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "cloud-sql-python-connector[pg8000]>=1.23.0",
     "google-adk>=2.0",
+    "google-cloud-secret-manager>=2.31.0",
 ]
 
 [tool.uv]

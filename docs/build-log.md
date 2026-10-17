@@ -8,6 +8,7 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 | 2 | 2026-10-16 | SMO-7 | Google Cloud project, budget and APIs |
 | 3 | 2026-10-16 | SMO-8 | Service accounts, least privilege, no keys |
 | 4 | 2026-10-16 | SMO-9 | Toolchain, ADK hello world, model endpoint decision |
+| 5 | 2026-10-17 | SMO-10 | Vector store: Cloud SQL free trial, schema, least privilege |
 
 ---
 
@@ -72,5 +73,21 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Por qué:** en n8n el nodo AI Agent escondía el bucle. En ADK el bucle se ve evento a evento, y una herramienta es solo una función de Python cuyo docstring se convierte en la descripción que lee el modelo.
 - **Aprendido:** **la región decide qué modelos tienes.** `europe-west1` solo sirve Gemini 2.5. Gemini 3.x (incluido 3.8 Flash, el modelo de n8n) solo está en `global` o en el endpoint jurisdiccional de la UE, `eu`. Elegimos `eu` + 3.8 Flash: el mismo modelo que la línea base y el procesamiento dentro de la UE. Además: winget instaló uv sin añadirlo al PATH, y el `.env` solo se lee al arrancar `adk web`.
 - **Siguiente:** SMO-10, ADR del almacén vectorial y Cloud SQL + pgvector.
+
+---
+
+## 5 · Vector store: Cloud SQL free trial, schema, least privilege (SMO-10) — 2026-10-17
+
+### EN
+- **What:** ADR-004 picked Cloud SQL Postgres + pgvector, because the n8n hybrid query (vectors + Spanish full-text + RRF) only runs unchanged on Postgres. Alexander found a **30-day free trial** instance (Enterprise Plus, 8 vCPU, 64 GB, €0) instead of the paid db-f1-micro. The schema is applied as code (`infra/sql/001_schema.sql`): two tables, an HNSW vector index, a GIN Spanish-search index, and IAM database users with grants. The admin password lives in Secret Manager and is read at run time.
+- **Why:** same engine and same query as the baseline, so the comparison stays fair. The free trial covers the deadline and frees the budget for models.
+- **Learned:** least privilege, tested rather than assumed. Connecting *as* each robot through impersonation: `sg-agent` can read and is refused writes; `sg-ingestion` can write. The free trial never auto-charges (it stops after 30 days), but "Upgrade" would cost hundreds a month. Spanish stemming turns "baterías" into `bat`. Small bug caught: our SQL splitter skipped statements that had trailing comments, so verify after every migration.
+- **Next:** SMO-11, export the catalog from n8n, choose the Google embedding model and load it.
+
+### ES
+- **Qué:** el ADR-004 eligió Cloud SQL Postgres + pgvector, porque la consulta híbrida de n8n (vectores + búsqueda de texto en español + RRF) solo funciona sin cambios en Postgres. Alexander encontró una instancia de **prueba gratuita de 30 días** (Enterprise Plus, 8 vCPU, 64 GB, 0 €) en lugar de la db-f1-micro de pago. El esquema se aplica como código (`infra/sql/001_schema.sql`): dos tablas, un índice vectorial HNSW, un índice GIN de búsqueda en español y usuarios IAM de base de datos con sus permisos. La contraseña de administrador está en Secret Manager y se lee al ejecutar.
+- **Por qué:** el mismo motor y la misma consulta que la línea base, así que la comparación es justa. La prueba gratuita cubre el plazo y libera presupuesto para los modelos.
+- **Aprendido:** el mínimo privilegio se prueba, no se supone. Conectando *como* cada robot mediante suplantación: `sg-agent` puede leer y se le deniega escribir; `sg-ingestion` puede escribir. La prueba gratuita nunca cobra sola (se para a los 30 días), pero "Upgrade" costaría cientos de euros al mes. El stemming en español convierte "baterías" en `bat`. Pequeño bug detectado: nuestro separador de SQL se saltaba sentencias con comentarios al final de línea, así que hay que verificar después de cada migración.
+- **Siguiente:** SMO-11, exportar el catálogo de n8n, elegir el modelo de embeddings de Google y cargarlo.
 
 ---

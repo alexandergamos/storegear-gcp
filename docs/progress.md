@@ -1,9 +1,9 @@
 # Progress summary
 
-*Updated 2026-10-17. Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
+*Updated 2026-10-17 (after SMO-10). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
 
 ## In one paragraph
-We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and next we create its tables and load the catalog.
+We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and its tables, Spanish search and permissions are live. Next we load the catalog.
 
 ## What we built, layer by layer
 
@@ -31,15 +31,16 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 ### 5. The database (SMO-10 · ADR-004)
 - **Why Postgres + pgvector:** the n8n search is one SQL query mixing meaning-based search (vectors) with **Spanish keyword search** (stemming). Postgres is the only option that runs it unchanged.
 - **What:** you found a **free 30-day trial** instance, `sg-catalog` (PostgreSQL 18, a large machine, €0). It has a `storegear` database and passwordless **IAM database users** for both robots and for you. The admin password is in Secret Manager.
+- **Schema (code in `infra/sql/`):** two tables (`catalog_chunks` = small passages that search ranks; `catalog_parents` = whole sections the agent reads), a vector index (HNSW) and a Spanish keyword index (GIN). "baterías" is stored as `bat`, so singular and plural match.
+- **Least privilege, proven:** connecting *as* each robot, everyone can read, only `sg-ingestion` can write, and `sg-agent` gets "permission denied". A tricked agent can't alter the catalog.
 - ⚠️ **Never click "Upgrade"** on the trial. It ends around 16 November by stopping; it never starts charging. Reminder set for 10 November.
 
 ## What's next
 | Next | Issue | What happens |
 |---|---|---|
-| 1 | SMO-10 | Create the tables, pgvector and Spanish search columns, and grant access to the robots |
-| 2 | SMO-11 | Export the catalog from n8n, re-embed it with a Google embedding model, load it |
-| 3 | SMO-12 | Port the hybrid search query as an agent tool; retrieval test must stay at 18/18 |
-| 4 | SMO-13 / 14 / 15 | Real StoreGear agent → 22-question eval → deploy. That completes Phase 1 (due 21 Oct) |
+| 1 | SMO-11 | Export the catalog from n8n, re-embed it with a Google embedding model, load it |
+| 2 | SMO-12 | Port the hybrid search query as an agent tool; retrieval test must stay at 18/18 |
+| 3 | SMO-13 / 14 / 15 | Real StoreGear agent → 22-question eval → deploy. That completes Phase 1 (due 21 Oct) |
 
 ## Numbers to beat (n8n, 2026-10-11)
 Correctness 5.00 · Faithfulness 4.95 · Context 5.00 · Answer 5.00 · median 9.0 s · ~$0.008 per answer.
