@@ -1,6 +1,6 @@
 # Progress summary
 
-*Updated 2026-10-17 (after SMO-11). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
+*Updated 2026-10-17 (after SMO-12). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
 
 ## In one paragraph
 We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and its tables, Spanish search and permissions are live. The catalog is loaded: 9,054 passages from 10 manuals, each with a Google embedding.
@@ -40,11 +40,16 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 - **How we chose the model:** a benchmark, not a guess. Both candidate models embedded the full catalog, then we checked the 17 eval questions: is the right manual first? **`gemini-embedding-2`: 16/17. `gemini-embedding-001`: 13/17** (it mixes up sibling Polar manuals).
 - **Gotcha worth remembering:** `gemini-embedding-2` returns *one* vector for a *list* of texts. Sending batches would have silently merged passages and ruined search. The script now checks this and fails loudly.
 
+### 7. The search tool (SMO-12 · ADR-005 addendum)
+- **What:** the n8n one-query hybrid search, ported 1:1 as a Python tool (`agent/storegear/tools/search.py`). It does vectors + Spanish keywords + rank fusion + the staff/manager filter, and returns the top 5 sections wrapped in `<manual>` tags (anti-prompt-injection "spotlighting").
+- **Result, run as `sg-agent`:** right manual first **17/17**, all needed manuals in the top 5 **16/17**, search **~0.6 s** (n8n: 1.33 s). Staff never sees the managers' manual.
+- **What we learned by measuring:** only 2–3 % of passages name their product, so we now embed the section header *with* the text (contextual embeddings). That took right-manual-first from 15/17 to 17/17.
+- **Honest gap:** comparison questions ("A vs B") need one search per product. The agent will do that (SMO-13), and the eval checks it (SMO-14).
+
 ## What's next
 | Next | Issue | What happens |
 |---|---|---|
-| 1 | SMO-12 | Port the hybrid search query as an agent tool; retrieval test must stay at 18/18 |
-| 2 | SMO-13 / 14 / 15 | Real StoreGear agent → 22-question eval → deploy. That completes Phase 1 (due 21 Oct) |
+| 1 | SMO-13 / 14 / 15 | Real StoreGear agent → 22-question eval → deploy. That completes Phase 1 (due 21 Oct) |
 
 ## Numbers to beat (n8n, 2026-10-11)
 Correctness 5.00 · Faithfulness 4.95 · Context 5.00 · Answer 5.00 · median 9.0 s · ~$0.008 per answer.

@@ -8,6 +8,7 @@ dependencies = [
     "google-adk>=2.0",
     "google-cloud-secret-manager>=2.31.0",
     "numpy>=2.5.4",
+    "sqlalchemy>=2.1.5",
 ]
 
 [tool.uv]

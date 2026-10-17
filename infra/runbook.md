@@ -138,3 +138,9 @@ uv run python ingestion/embed_export.py gemini-embedding-2       # ~5 min, one t
 uv run python eval/retrieval_benchmark.py gemini-embedding-2     # manual@1 / manual@5 / MRR on 17 questions
 uv run python ingestion/load_catalog.py gemini-embedding-2       # as sg-ingestion (impersonation); idempotent upsert
 ```
+
+## SMO-12 · Hybrid search benchmark (2026-10-17)
+```powershell
+$env:STOREGEAR_IMPERSONATE_SA="sg-agent@storegear-prod-ag26.iam.gserviceaccount.com"   # run AS the agent
+uv run python eval/hybrid_benchmark.py
+```

@@ -6,6 +6,10 @@
 Output: data/emb_<model>.npy (float32, one row per chunk, same order as data/catalog_chunks.csv)
         data/emb_<model>.ids.json (child_id per row)
 
+Contextual embeddings (2026-10-17): we embed "header_path + chunk_text", not chunk_text alone. Only 2-3 % of
+chunks name their own product; the header always does ("Polar Ignite 2.pdf > ..."), so without it sibling
+manuals (Polar Grit X2 vs Ignite 2) look alike to the embedding.
+
 Gotcha found 2026-10-17: gemini-embedding-2 treats a list of texts as ONE multimodal input and returns ONE
 vector, so batching silently merges chunks. It must be called one text at a time.
 """
@@ -30,7 +34,7 @@ MODELS = {  # model -> (location, batch size)
 def load_chunks(path: str = "data/catalog_chunks.csv") -> list[dict]:
     csv.field_size_limit(2**31 - 1)
     with open(path, encoding="utf-8", newline="") as fh:
-        return [{"child_id": r["child_id"], "text": r["chunk_text"]} for r in csv.DictReader(fh)]
+        return [{"child_id": r["child_id"], "text": r["header_path"] + "\n" + r["chunk_text"]} for r in csv.DictReader(fh)]
 
 
 def embed_batch(client, model: str, texts: list[str], task: str) -> list[list[float]]:

@@ -10,6 +10,7 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 | 4 | 2026-10-16 | SMO-9 | Toolchain, ADK hello world, model endpoint decision |
 | 5 | 2026-10-17 | SMO-10 | Vector store: Cloud SQL free trial, schema, least privilege |
 | 6 | 2026-10-17 | SMO-11 | Catalog export, embedding benchmark, load |
+| 7 | 2026-10-17 | SMO-12 | Hybrid search tool, contextual embeddings |
 
 ---
 
@@ -106,5 +107,21 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Por qué:** elegir midiendo con nuestros propios datos. La calidad de la recuperación es la base de la puntuación de 5.00.
 - **Aprendido:** ⚠️ `gemini-embedding-2` devuelve UN vector para una lista de textos. Mandar lotes habría fusionado pasajes en silencio, sin ningún error. Ahora hay una comprobación explícita del número de vectores. Además, cada modelo de embeddings vive en un endpoint distinto (`001` en europe-west1, `2` solo en `eu`).
 - **Siguiente:** SMO-12, portar la búsqueda híbrida de una sola consulta como herramienta de ADK y repetir la prueba de recuperación 18/18.
+
+---
+
+## 7 · Hybrid search tool, contextual embeddings (SMO-12) — 2026-10-17
+
+### EN
+- **What:** the n8n hybrid search ported 1:1 as an ADK-ready Python tool. It uses the same SQL, a pooled Cloud SQL connection with IAM auth, `<manual>` spotlighting, and the role passed from the login (never from the model). Benchmarked as `sg-agent`: right manual first 17/17, all needed manuals in the top 5 16/17, median 0.6 s (n8n 1.33 s). Role filter verified.
+- **Why:** retrieval is half of answer quality, and it's cheaper to fix here than in the eval.
+- **Learned:** measure, look at the misses, fix the cause. The first run scored 15/17: sibling Polar manuals were confused because only 2–3 % of chunks name their product. Embedding `header_path + chunk_text` (contextual embeddings) brought it to 17/17. A per-manual diversity cap didn't fix the comparison question, because the right section was never retrieved. Comparisons need one search per product, which is the agent's job.
+- **Next:** SMO-13, the StoreGear agent (prompt, tools, pre-retrieval).
+
+### ES
+- **Qué:** la búsqueda híbrida de n8n portada 1:1 como herramienta de Python lista para ADK. Usa el mismo SQL, una conexión a Cloud SQL en pool con autenticación IAM, el etiquetado `<manual>` y el rol pasado desde el login (nunca desde el modelo). Medida como `sg-agent`: manual correcto el primero 17/17, todos los manuales necesarios en el top 5 16/17, mediana 0,6 s (n8n 1,33 s). Filtro por rol verificado.
+- **Por qué:** la recuperación es la mitad de la calidad de la respuesta, y es más barato arreglarla aquí que en el eval.
+- **Aprendido:** medir, mirar los fallos y arreglar la causa. La primera ejecución dio 15/17: se confundían manuales hermanos de Polar porque solo el 2-3 % de los chunks nombran su producto. Embeber `header_path + chunk_text` (embeddings contextuales) lo subió a 17/17. Un límite de diversidad por manual no arregló la pregunta de comparación, porque la sección correcta ni siquiera se recuperaba. Las comparaciones necesitan una búsqueda por producto, y eso es tarea del agente.
+- **Siguiente:** SMO-13, el agente de StoreGear (prompt, herramientas, búsqueda previa).
 
 ---

@@ -34,6 +34,17 @@ Embeddings turn each passage (and each question) into a vector, so that "meaning
   - The vectors are normalised, so cosine distance is the right measure (`vector_cosine_ops` index).
   - Changing the model later means re-embedding everything; vectors from different models are not comparable.
 
+## Addendum (2026-10-17, SMO-12): contextual embeddings
+The full hybrid benchmark showed sibling-manual confusion: only 2-3 % of chunks name their own product, while `header_path` always does ("Polar Ignite 2.pdf > …"). We now embed **`header_path + "\n" + chunk_text`**. The keyword side is unchanged (`search_vector` is still generated from `chunk_text`, identical to n8n).
+
+| Hybrid search (17 q, as sg-agent) | Right manual 1st | All needed manuals in top 5 | Median search |
+|---|---|---|---|
+| chunk_text only | 15/17 | 17/17 | 0.58 s |
+| **header + chunk_text** | **17/17** | 16/17 | 0.60–0.69 s |
+| n8n reference (18 q, OpenAI embeddings) | 18/18 | 18/18 | 1.33 s |
+
+The remaining miss is **Q16, a comparison** ("Instinct 3 vs Vantage M2"): generic "water resistance of Polar products" sections from every Polar manual fill the candidates, and the Instinct spec section isn't among the top 20. Comparisons are answered by the agent searching **each product separately**, as the n8n agent did with 3 searches. The 22-question eval (Q16, Q22) is the real test.
+
 ## Revisit when
 - The full hybrid benchmark (SMO-12) or the 22-question eval (SMO-14) shows retrieval misses that trace back to embeddings.
 - A Google embedding model becomes available in `europe-west1` with equal quality and strict residency matters.

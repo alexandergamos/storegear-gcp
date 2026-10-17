@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const UPDATED = '2026-10-17';
-const HEADLINE = 'Phase 0 done · Phase 1: catalog loaded (SMO-11) · next SMO-12 hybrid search tool';
+const HEADLINE = 'Phase 0 done · Phase 1: hybrid search tool live (SMO-12) · next SMO-13 the StoreGear agent';
 
 // ---------------------------------------------------------------- content (edit statuses here)
 const LAPTOP = [
@@ -39,8 +39,8 @@ const GCP = [ // [title, items]
     ['done', '9,054 chunks · gemini-emb-2'],
   ]],
   ['Agent code', [
-    ['wip', 'Hybrid search tool (SMO-12)'],
-    ['todo', 'StoreGear agent (SMO-13)'],
+    ['done', 'Hybrid search · 17/17 · 0.6 s'],
+    ['wip', 'StoreGear agent (SMO-13)'],
     ['todo', 'Eval harness (SMO-14)'],
   ]],
   ['Ingestion pipeline', [
