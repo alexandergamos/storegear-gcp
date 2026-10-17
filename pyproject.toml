@@ -6,6 +6,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "cloud-sql-python-connector[pg8000]>=1.23.0",
     "google-adk>=2.0",
+    "google-cloud-aiplatform[adk,agent-engines]>=1.112",
     "google-cloud-secret-manager>=2.31.0",
     "numpy>=2.5.4",
     "sqlalchemy>=2.1.5",
