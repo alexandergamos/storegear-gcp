@@ -149,3 +149,10 @@ uv run python eval/hybrid_benchmark.py
 - Enable **Google Sheets API**: `gcloud services enable sheets.googleapis.com --project $PROJECT_ID`
 - Share the **StoreGear** sheet (`1KnKC0iFDCzChg9szTkDazkwmgqQGQpbDg2raZ0EI2m4`) with `sg-agent@$PROJECT_ID.iam.gserviceaccount.com` as **Viewer** (Drive sharing, not IAM).
 - Try the agent: `copy agent/storegear/.env.example agent/storegear/.env`, then `uv run python agent/ask.py "pregunta"` or `cd agent; uv run adk web`.
+
+## SMO-14 · Eval gate (2026-10-17; ADR-007)
+```bash
+uv run python eval/run_eval.py              # 22 questions, ~10 min, a few cents; results in eval/results/ (git-ignored)
+uv run python eval/run_eval.py --only 6 13  # subset while iterating
+```
+Gate: every metric ≥ n8n baseline − 0.1 (Corr 4.90 · Faith 4.85 · Ctx 4.90 · Ans 4.90).

@@ -12,6 +12,7 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 | 6 | 2026-10-17 | SMO-11 | Catalog export, embedding benchmark, load |
 | 7 | 2026-10-17 | SMO-12 | Hybrid search tool, contextual embeddings |
 | 8 | 2026-10-17 | SMO-13 | The StoreGear agent: prompt, tools, pre-retrieval |
+| 9 | 2026-10-17 | SMO-14 | Eval gate: from 4.77 to 4.95, and the tail-latency trap |
 
 ---
 
@@ -140,5 +141,21 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Por qué:** primero paridad de comportamiento, después medir (SMO-14).
 - **Aprendido:** la pregunta de comparación que fallaba en la prueba de recuperación la resuelve el comportamiento del agente. El modelo vio que la búsqueda previa cubría un solo producto y buscó el otro. Las pruebas de recuperación y los evals del agente miden cosas distintas. Las respuestas de precio cuestan dos llamadas al modelo más una lectura de la hoja (~23 s en frío), así que la latencia es lo siguiente que hay que medir.
 - **Siguiente:** SMO-14, el eval de 22 preguntas con jueces LLM.
+
+---
+
+## 9 · Eval gate: from 4.77 to 4.95, and the tail-latency trap (SMO-14) — 2026-10-17
+
+### EN
+- **What:** an eval harness replicating n8n (same dataset, judge prompts copied from Langfuse, same judge model). Run 1: Correctness 4.77, failing the gate; the agent stopped one search early on Q6, Q12 and Q13. Medium thinking fixed it but was 6× slower, so it was rejected. Final: explicit guidance in the pre-retrieval block plus a model-call timeout/retry. **Corr 4.95 · Faith 4.91 · Ctx 5.00 · Ans 5.00 · median 6.2 s** (n8n 5.00/4.95/5.00/5.00, 9.0 s). Gate passed. ADR-007.
+- **Why:** a regression gate we can run on every change and later in CI.
+- **Learned:** (1) **Tail latency is a different problem from median latency.** The `eu` endpoint's median is ~2.5 s per call, but some calls queued for 30–190 s, with no 429 visible. A 15 s deadline plus retries cuts the tail without leaving the EU. (2) More thinking is the expensive way to fix "stopped too early"; precise guidance is the cheap way. (3) Measure every step: the searches were ~1 s, so the model was the culprit.
+- **Next:** SMO-15, deploy to Agent Runtime and measure there.
+
+### ES
+- **Qué:** un harness de eval que replica el de n8n (mismo dataset, prompts de los jueces copiados de Langfuse, mismo modelo juez). Ejecución 1: corrección 4,77, suspende el umbral; el agente paraba una búsqueda antes de tiempo en Q6, Q12 y Q13. El razonamiento medio lo arreglaba pero era 6× más lento, así que se descartó. Final: indicaciones explícitas en el bloque de búsqueda previa más un timeout con reintentos en las llamadas al modelo. **Corr 4,95 · Fidel 4,91 · Ctx 5,00 · Resp 5,00 · mediana 6,2 s** (n8n 5,00/4,95/5,00/5,00, 9,0 s). Umbral superado. ADR-007.
+- **Por qué:** un control de regresión que podemos ejecutar en cada cambio y, más adelante, en CI.
+- **Aprendido:** (1) **la latencia de cola es un problema distinto de la latencia mediana.** El endpoint `eu` tiene una mediana de ~2,5 s por llamada, pero algunas llamadas se quedaban en cola 30–190 s, sin ningún 429 visible. Un límite de 15 s con reintentos recorta la cola sin salir de la UE. (2) Más razonamiento es la forma cara de arreglar "paró demasiado pronto"; unas indicaciones precisas son la forma barata. (3) Medir cada paso: las búsquedas tardaban ~1 s, así que el culpable era el modelo.
+- **Siguiente:** SMO-15, desplegar en Agent Runtime y medir allí.
 
 ---

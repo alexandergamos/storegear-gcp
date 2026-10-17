@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const UPDATED = '2026-10-17';
-const HEADLINE = 'Phase 0 done · Phase 1: StoreGear agent answers like n8n (SMO-13) · next SMO-14 the 22-question eval';
+const HEADLINE = 'Phase 1: eval gate PASSED (4.95 / 4.91 / 5 / 5, median 6.2 s vs n8n 9.0 s) · next SMO-15 deploy';
 
 // ---------------------------------------------------------------- content (edit statuses here)
 const LAPTOP = [
@@ -41,7 +41,7 @@ const GCP = [ // [title, items]
   ['Agent code', [
     ['done', 'Hybrid search · 17/17 · 0.6 s'],
     ['done', 'StoreGear agent · rules 1-12'],
-    ['wip', 'Eval harness (SMO-14)'],
+    ['done', 'Eval gate passed · 4.95'],
   ]],
   ['Ingestion pipeline', [
     ['todo', 'Document AI parse (SMO-16)'],
@@ -53,7 +53,7 @@ const SOURCES = [
   ['done', 'n8n catalog export ✓'],
   ['done', 'Price/stock Sheet · live'],
   ['todo', 'Drive manuals (SMO-20)'],
-  ['todo', 'n8n baseline · 22 q (SMO-14)'],
+  ['done', 'n8n baseline · 22 q ✓'],
 ];
 const PHASES = [
   ['done', 'Phase 0 · Foundations', '15-16 Oct'],

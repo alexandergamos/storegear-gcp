@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 
 from google.adk.agents import Agent
+from google.adk.models.google_llm import Gemini
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models.llm_request import LlmRequest
 from google.adk.tools import ToolContext
@@ -33,8 +34,15 @@ BUSQUEDA PREVIA AUTOMATICA: el sistema ya ha ejecutado "buscar_catalogo_hibrido"
 COMO USARLA:
 - Si estos resultados contienen lo que se pregunta, responde directamente con ellos, SIN volver a buscar.
 - Llama a "buscar_catalogo_hibrido" solo si: (a) el mensaje depende de la conversacion anterior (ej: "y la bateria?") y los resultados no son del producto del que se habla; (b) falta el dato o el modelo correcto; (c) es una comparacion y falta un producto; (d) el texto remite a otra seccion o menu (regla 11).
+- PREGUNTAS DE "COMO SE HACE" (regla 11): si estos resultados nombran un menu, pantalla o control (ej: "menu de controles") pero NO dicen que boton pulsar o mantener pulsado para abrirlo, haz una segunda busqueda con el modelo y el nombre de ese menu (ej: "Venu X1 abrir menu de controles boton") ANTES de responder.
+- CIFRAS DE ESPECIFICACIONES (impermeabilidad, bateria, dimensiones, temperaturas, peso): si la cifra concreta que se pregunta no aparece en estos resultados, busca "<modelo> especificaciones tecnicas <dato>" antes de responder. No respondas "consulta el dispositivo" sin haber buscado la ficha tecnica.
 - Para precio o stock usa "consultar_precio_stock" con el fileId de estos resultados (regla 2).
 - Las reglas 7 (ambiguedad), 9 y 10 se aplican igual: si la pregunta es ambigua, pregunta primero aunque haya resultados."""
+
+
+# Pre-retrieval block per invocation, kept in process memory so evals can show the judge what the model saw
+# ("temp:" session state is discarded at the end of each turn). Bounded to the last 200 turns.
+LAST_PRE: dict[str, str] = {}
 
 
 def _role(state) -> str:
@@ -78,6 +86,9 @@ def pre_retrieval(callback_context: CallbackContext, llm_request: LlmRequest):
         rows = hybrid_search(text, role=_role(state)) if text else []
         block = PRE_RETRIEVAL.format(results=format_for_agent(rows)) if rows else ""
         state[key] = block
+        LAST_PRE[callback_context.invocation_id] = block
+        while len(LAST_PRE) > 200:
+            LAST_PRE.pop(next(iter(LAST_PRE)))
     if block:
         llm_request.append_instructions([block])
     return None
@@ -85,13 +96,19 @@ def pre_retrieval(callback_context: CallbackContext, llm_request: LlmRequest):
 
 root_agent = Agent(
     name="storegear",
-    model=os.getenv("STOREGEAR_MODEL", "gemini-3.8-flash"),
+    # Tail-latency guard (SMO-14): the eu endpoint occasionally queues a call for 30-190 s while the median is
+    # ~2.5 s. A per-call timeout plus retry ("hedging") re-sends slow calls, which usually land on free capacity.
+    model=Gemini(
+        model=os.getenv("STOREGEAR_MODEL", "gemini-3.8-flash"),
+        retry_options=types.HttpRetryOptions(attempts=3, initial_delay=0.5, max_delay=2.0),
+    ),
     description="Asistente de tienda: especificaciones de smartwatches y precio/stock en vivo.",
     instruction=PROMPT,
     tools=[buscar_catalogo_hibrido, consultar_precio_stock],
     before_model_callback=pre_retrieval,
     generate_content_config=types.GenerateContentConfig(
         temperature=0.2,
+        http_options=types.HttpOptions(timeout=int(os.getenv("STOREGEAR_MODEL_TIMEOUT_MS", "15000"))),
         thinking_config=types.ThinkingConfig(thinking_level=os.getenv("STOREGEAR_THINKING", "low")),
     ),
 )

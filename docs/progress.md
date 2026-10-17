@@ -1,6 +1,6 @@
 # Progress summary
 
-*Updated 2026-10-17 (after SMO-13). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
+*Updated 2026-10-17 (after SMO-14). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
 
 ## In one paragraph
 We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and its tables, Spanish search and permissions are live. The catalog is loaded: 9,054 passages from 10 manuals, each with a Google embedding.
@@ -53,11 +53,23 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 - **To watch:** latency 5–23 s locally and cold; measured properly in SMO-14 and SMO-15.
 - **Try it yourself:** `uv run python agent/ask.py "tu pregunta"` shows every step and its timing.
 
+### 9. The eval gate (SMO-14 · ADR-007)
+- **What:** the same 22 questions, the same two LLM judges (copied from Langfuse) and the same judge model as n8n, so the comparison is fair. Script: `uv run python eval/run_eval.py`.
+- **First run failed the gate:** correctness 4.77. In three answers the agent stopped one search too early: two "how do I…" answers didn't say how to open the menu, and one missed the "30 m" spec.
+- **Tried and rejected:** medium thinking fixed it but was 6× slower.
+- **What passed:** clearer guidance in the pre-retrieval block, plus a **timeout and retry** on model calls. The EU endpoint sometimes queues a call for 30–190 s; now slow calls are re-sent after 15 s.
+
+| | Google Cloud | n8n |
+|---|---|---|
+| Correctness | **4.95** | 5.00 |
+| Faithfulness | **4.91** | 4.95 |
+| Context / Answer relevance | **5.00 / 5.00** | 5.00 / 5.00 |
+| Median answer time | **6.2 s** | 9.0 s |
+
 ## What's next
 | Next | Issue | What happens |
 |---|---|---|
-| 1 | SMO-14 | Port the 22-question eval with the LLM judges (correctness + RAG triad) and compare against n8n |
-| 2 | SMO-15 | Deploy to Agent Runtime (or Cloud Run) and measure latency and cost. That completes Phase 1 (due 21 Oct) |
+| 1 | SMO-15 | Deploy to Agent Runtime (or Cloud Run) and measure latency and cost. That completes Phase 1 (due 21 Oct) |
 
 ## Numbers to beat (n8n, 2026-10-11)
 Correctness 5.00 · Faithfulness 4.95 · Context 5.00 · Answer 5.00 · median 9.0 s · ~$0.008 per answer.
