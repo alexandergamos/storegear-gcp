@@ -40,13 +40,23 @@ ENV = {
 }
 
 
+def eu_session_service():
+    """Managed Sessions pinned to the eu multi-region endpoint (aiplatform.eu.rep.googleapis.com).
+    Inside the runtime the default builder uses a reserved location variable that doesn't resolve to 'eu'
+    (sessions then 404 with "The ReasoningEngine does not exist"); pinning it explicitly works."""
+    import os
+    from google.adk.sessions import VertexAiSessionService
+    return VertexAiSessionService(project="storegear-prod-ag26", location="eu",
+                                  agent_engine_id=os.environ["GOOGLE_CLOUD_AGENT_ENGINE_ID"])
+
+
 def main(update: bool) -> None:
     os.chdir(ROOT / "agent")          # so `storegear` is importable and packaged by its folder name
     sys.path.insert(0, str(ROOT / "agent"))
     from storegear.agent import root_agent
 
     client = vertexai.Client(project=PROJECT, location=LOCATION)
-    app = agent_engines.AdkApp(agent=root_agent)
+    app = agent_engines.AdkApp(agent=root_agent, session_service_builder=eu_session_service)
     # The template takes project/location from vertexai.init() and uses them in the runtime for Sessions and models.
     # vertexai.init(location="eu") is rejected by this SDK's region check, and the runtime reserves the
     # GOOGLE_CLOUD_AGENT_ENGINE_* env vars, so set the captured values directly (otherwise: us-central1 -> 404).
