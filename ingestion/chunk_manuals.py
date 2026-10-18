@@ -25,6 +25,12 @@ CHILD_MAX, PARENT_MAX, DUP_SIM = 600, 8000, 0.8
 SKIP_TITLES = re.compile(r"garant[ií]a|warranty|marcas comerciales|trademark|copyright|derechos de autor|declaraci[oó]n de conformidad|"
                          r"conformidad|licencia|license|eliminaci[oó]n|reciclaje|disposal|aviso legal|descargo|disclaimer|normativ|regulator", re.I)
 COMMON = ("polar-common", "Polar · información común")
+# Only BRAND-level sections may be folded into the common copy. Device features (FuelWise, Running test...) are
+# shared by some Polar models only, so folding them would erase which watch has the feature (eval Q14).
+COMMON_TITLES = re.compile(r"impermeabilidad al agua de los productos|utilizar tu producto polar de forma segura|precauciones|"
+                           r"cuidados de tu reloj|mant[eé]n limpio|almacenamiento|servicio t[eé]cnico|salud y entrenamiento|"
+                           r"advertencia: mant[eé]n las pilas|interferencias electromagn|software polar flowsync|"
+                           r"compatibilidad de aplicaciones|limitaci[oó]n de responsabilidades|trata con cuidado el sensor", re.I)
 
 
 def file_ids() -> dict[str, str]:
@@ -74,6 +80,8 @@ def table_rows(block: list[str]) -> list[str]:
                 out.append(f"{label} {value}".strip() if label.endswith(":") else f"{label}: {value}".strip(": "))
     else:                                         # wide table: first row = column headers
         head, body = rows[0], rows[1:]
+        if body and sum(1 for r in body if not (r[0] if r else "")) > len(body) / 2:   # icon column (empty) -> drop it
+            head, body = head[1:], [r[1:] for r in body]
         for r in body:
             label = r[0] if r else ""
             parts = [f"{h}: {c}" for h, c in zip(head[1:], r[1:]) if c]
@@ -81,7 +89,14 @@ def table_rows(block: list[str]) -> list[str]:
                 out[-1] += " / " + "; ".join(parts)
             elif label or parts:
                 out.append(f"{label} — " + "; ".join(parts) if parts else label)
-    return out
+    capped = []   # safety net: very long row groups split at their " / " joins
+    for row in out:
+        while len(row) > 2 * CHILD_MAX and " / " in row[CHILD_MAX:]:
+            cut = row.index(" / ", CHILD_MAX)
+            capped.append(row[:cut])
+            row = row[cut + 3:]
+        capped.append(row)
+    return capped
 
 
 def chunks_of(lines: list[str]) -> list[str]:
@@ -92,7 +107,11 @@ def chunks_of(lines: list[str]) -> list[str]:
         text = " ".join(p.strip() for p in prose if p.strip())
         prose.clear()
         buf = ""
-        for sent in re.split(r"(?<=[.!?:])\s+", text):
+        pieces = []
+        for sent in re.split(r"(?<=[.!?:])\s+", text):   # long run-ons (lists without full stops) -> word windows
+            words = sent.split()
+            pieces += [" ".join(words[i:i + 90]) for i in range(0, len(words), 90)] or [sent]
+        for sent in pieces:
             if len(buf) + len(sent) > CHILD_MAX and buf:
                 out.append(buf.strip())
                 buf = ""
@@ -142,7 +161,7 @@ def main() -> None:
         by_title[re.sub(r"\W+", " ", s["title"].lower()).strip()].append(s)
     dup_ids, common = set(), []
     for title, group in by_title.items():
-        if len({s["file_name"] for s in group}) < 3:
+        if not COMMON_TITLES.search(title) or len({s["file_name"] for s in group}) < 3:
             continue
         ref = shingles(group[0]["body"])
         similar = [s for s in group if jaccard(ref, shingles(s["body"])) >= DUP_SIM]
