@@ -176,3 +176,16 @@ gcloud services enable documentai.googleapis.com --project $PROJECT_ID
 uv run python ingestion/parser_test.py gemini
 uv run python ingestion/parser_test.py docai --processor 8a9ba69484bf2664
 ```
+
+## SMO-17 · New catalog: parse, chunk, load, swap (2026-10-18; ADR-009 addendum)
+```bash
+uv run python ingestion/parse_manuals.py                    # data/parsed/full/*.md + report.json (resumable)
+uv run python ingestion/chunk_manuals.py                    # data/catalog_v2/{chunks,parents}.csv
+uv run python infra/sql/apply.py infra/sql/002_catalog_v2.sql   # side tables catalog_*_v2 + grants
+uv run python ingestion/embed_export.py gemini-embedding-2 data/catalog_v2/chunks.csv
+uv run python ingestion/load_catalog.py gemini-embedding-2 --v2
+STOREGEAR_CATALOG_SUFFIX=_v2 uv run python eval/hybrid_benchmark.py   # benchmark + eval against v2 before going live
+STOREGEAR_CATALOG_SUFFIX=_v2 uv run python eval/run_eval.py
+uv run python infra/sql/apply.py infra/sql/003_swap_catalog_v2.sql    # one transaction; v1 kept as catalog_*_v1
+# Rollback: the same four renames in reverse (live -> _v2, _v1 -> live).
+```
