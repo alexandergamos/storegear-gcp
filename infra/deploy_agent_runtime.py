@@ -44,6 +44,9 @@ def main(update: bool) -> None:
     sys.path.insert(0, str(ROOT / "agent"))
     from storegear.agent import root_agent
 
+    # AdkApp captures project/location from vertexai.init() and the runtime uses them for Sessions and model calls.
+    # Without this it silently defaults to us-central1 ("The ReasoningEngine does not exist" on first session).
+    vertexai.init(project=PROJECT, location=LOCATION, staging_bucket=STAGING)
     client = vertexai.Client(project=PROJECT, location=LOCATION)
     app = agent_engines.AdkApp(agent=root_agent)
     config = {
