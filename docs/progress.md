@@ -1,6 +1,6 @@
 # Progress summary
 
-*Updated 2026-10-18 (after SMO-16). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
+*Updated 2026-10-18 (after SMO-17). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
 
 ## In one paragraph
 We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and its tables, Spanish search and permissions are live. The catalog is loaded: 9,054 passages from 10 manuals, each with a Google embedding.
@@ -79,10 +79,18 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 - **Cost, measured:** Gemini ≈ $2.6 per 1,000 pages (≈ $2.8 for the whole catalog) vs Document AI $10 (≈ $11). You questioned the first assumption, and measuring showed it was wrong.
 - **Decision (you):** Gemini parses, an automatic coverage check compares its text with the PDF, and Document AI re-parses any batch below 95 %.
 
+### 12. The new catalog (SMO-17) — Q6 fixed
+- **What:** all 10 manuals re-read with Gemini (98 % of the text kept; Document AI stepped in on 3 of 334 page batches), then chunked **table-aware**: every table row is its own chunk, e.g. `Impermeabilidad: 30 m (ISO 22810…)`.
+- **Three chunker bugs caught by looking at the output before loading:** features like FuelWise had been folded into a "common" bucket (that would erase which watch has them); long lists without full stops made 7,000-character chunks; empty icon columns merged a whole table into one chunk.
+- **Safe rollout:** built in side tables (`_v2`), benchmarked, evaluated, then swapped in with one transaction. The old catalog is kept for rollback.
+- **Result in the cloud:** all 22 questions score 5 when the model answers, **Q6 included**. Answers use about **43 % fewer tokens**, so they're cheaper, and the median is **3.8 s**.
+- **Open item:** one question timed out once (a 504 from the EU endpoint's rare 40-second delays). That's an availability problem, handled in Phase 4 with a friendly fallback reply.
+
 ## What's next
 | Next | Issue | What happens |
 |---|---|---|
-| 1 | SMO-17 | Table-aware chunking (fixes Q6), injection check, then re-run the gate in the cloud |
+| 1 | SMO-18 | Prompt-injection check at ingestion + quarantine table |
+| 2 | SMO-19 / 20 | Queue + worker on Google Cloud, Drive sync: new manuals flow in automatically |
 
 ## Numbers to beat (n8n, 2026-10-11)
 Correctness 5.00 · Faithfulness 4.95 · Context 5.00 · Answer 5.00 · median 9.0 s · ~$0.008 per answer.

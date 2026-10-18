@@ -15,6 +15,7 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 | 9 | 2026-10-17 | SMO-14 | Eval gate: from 4.77 to 4.95, and the tail-latency trap |
 | 10 | 2026-10-18 | SMO-15 | Deploy to Agent Runtime: six laptop-vs-cloud surprises |
 | 11 | 2026-10-18 | SMO-16 | Parser bake-off: Gemini vs Document AI |
+| 12 | 2026-10-18 | SMO-17 | New catalog: table-aware chunks, Q6 fixed, 43 % fewer tokens |
 
 ---
 
@@ -191,5 +192,21 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Por qué:** la calidad de la búsqueda empieza al leer el PDF; Q6 falla porque una fila de tabla perdió su etiqueta.
 - **Aprendido:** «el servicio especializado es más barato» era una suposición, y era falsa. Medido: Gemini ≈ 2,6 $ por 1.000 páginas frente a 10 $ de Document AI. La comprobación de precio por respuesta cuadra con el coste de Langfuse en n8n. La pregunta que lo destapó la hizo Alexander. Un empate 9/9 en las trampas escondía una diferencia real en la estructura de las tablas: hay que leer los resultados, no solo la nota.
 - **Siguiente:** SMO-17, volver a leer los PDFs y trocear las tablas fila a fila; después repetir el eval en la nube para Q6.
+
+---
+
+## 12 · New catalog: table-aware chunks, Q6 fixed, 43 % fewer tokens (SMO-17) — 2026-10-18
+
+### EN
+- **What:** full parse of 10 manuals (Gemini, shingle coverage 97.6–98.8 %, Document AI fallback on 3/334 batches); table-aware chunker (one chunk per row, brand-only folding, word caps, icon columns dropped). 12,792 chunks loaded into side tables, benchmarked (top-5 now 17/17), evaluated (4.95 / 5.00 / 5.00 / 5.00), swapped live in one transaction (v1 kept). Cloud eval: 22/22 at 5 when the model answers, Q6 fixed; median 3.8 s; ~5,400 input tokens per answer (was ~9,900).
+- **Why:** Q6 was a data problem; fix the data, not the prompt.
+- **Learned:** (1) **inspect the output before loading.** Three chunker bugs (over-eager folding that erased feature ownership, unsplit lists, icon columns) would each have silently hurt retrieval; none would have crashed. (2) Side tables plus a transactional rename make a data migration reversible in one statement. (3) Smaller, more precise chunks improved quality *and* cut cost. (4) Availability is now the weakest link: one 504 after 3 × 15 s, to be handled in Phase 4.
+- **Next:** SMO-18, prompt-injection check at ingestion.
+
+### ES
+- **Qué:** lectura completa de 10 manuales (Gemini, cobertura por shingles del 97,6–98,8 %, respaldo de Document AI en 3/334 lotes); troceado consciente de tablas (un chunk por fila, solo se agrupan las secciones de marca, límite de palabras, columnas de iconos eliminadas). 12.792 chunks cargados en tablas paralelas, medidos (top 5 ahora 17/17), evaluados (4,95 / 5,00 / 5,00 / 5,00) y activados con una sola transacción (v1 se conserva). Eval en la nube: 22/22 con un 5 cuando el modelo responde, Q6 arreglada; mediana 3,8 s; ~5.400 tokens de entrada por respuesta (antes ~9.900).
+- **Por qué:** Q6 era un problema de datos; se arreglan los datos, no el prompt.
+- **Aprendido:** (1) **revisar el resultado antes de cargar.** Tres errores del troceado (agrupar de más, que borraba qué reloj tiene cada función; listas sin cortar; columnas de iconos) habrían empeorado la búsqueda en silencio; ninguno habría dado un error. (2) Tablas paralelas más un renombrado en una transacción hacen que una migración de datos se pueda deshacer con una sola sentencia. (3) Chunks más pequeños y precisos mejoraron la calidad *y* bajaron el coste. (4) La disponibilidad es ahora el eslabón más débil: un 504 tras 3 × 15 s, que se resolverá en la fase 4.
+- **Siguiente:** SMO-18, detección de prompt injection en la ingesta.
 
 ---

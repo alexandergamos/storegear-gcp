@@ -43,6 +43,14 @@ Correctness misses the gate by 0.04, from **Q6 only** (Ignite 2 water resistance
 **Root cause:** the "30 m" lives in one row of the specs **HTML table** (`<td>Impermeabilidad:</td><td>30 m (ISO 22810…`), chunked together with a long GPS-accuracy paragraph. Vector search sees "GPS accuracy", and keyword search prefers the boilerplate section *"La impermeabilidad al agua de los productos Polar"*, which repeats in every Polar manual (9 of the 15 slots returned for Q6).
 **Decision (Alexander, option A):** close Phase 1 with this documented gap. Fix the cause in **SMO-17** (table-aware chunking: one chunk per spec row with its product header; de-duplicate cross-manual boilerplate), then re-run the gate in the cloud. No hand patch to the data now.
 
+## Addendum (2026-10-18, SMO-17): eval on the new catalog, in the cloud
+| Run | Corr | Faith | Ctx | Ans | Median | Notes |
+|---|---|---|---|---|---|---|
+| 5 · cloud, catalog v2 | 4.82 | 4.82 | 5.00 | 4.82 | **3.8 s** | 21/22 perfect; **Q6 now 5**; Q9 = 504 DEADLINE_EXCEEDED after 40 s (all 3 attempts of 15 s timed out) |
+| 5b · Q9 re-run | 5 | 5 | 5 | 5 | 2.5 s | Same question, normal answer |
+
+**Quality: 22/22 answers at 5 when the model responds.** The remaining risk is **availability**: the `eu` endpoint's tail latency can still outlast 3 × 15 s. Handled in Phase 4 (SMO-27): a friendly fallback reply, the dead-letter queue, and possibly a smarter retry policy (longer last attempt, or a non-EU fallback only with Alexander's approval).
+
 ## Consequences
 - **Good:** quality parity with n8n and 30 % faster median. A repeatable, scripted gate is ready for CI (SMO-28).
 - **Bad / accepted:** the guidance deviates slightly from n8n's text, recorded here. LLM judges have variance: one question can move ±1 between runs. n8n duplicated Q10/Q16 (as Q21/Q22) for that reason.

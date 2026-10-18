@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const UPDATED = '2026-10-17';
-const HEADLINE = 'Phase 1 done · Phase 2: parser chosen (SMO-16, Gemini + Document AI fallback) · next SMO-17 table-aware chunking (fixes Q6)';
+const HEADLINE = 'Phase 2: new catalog live (SMO-17) · cloud eval 22/22 at 5 when answered · Q6 fixed · next SMO-18 injection check';
 
 // ---------------------------------------------------------------- content (edit statuses here)
 const LAPTOP = [
@@ -36,7 +36,7 @@ const GCP = [ // [title, items]
   ['Data · Cloud SQL', [
     ['done', 'sg-catalog · PG18 · free trial'],
     ['done', 'Schema + least privilege'],
-    ['done', '9,054 chunks · gemini-emb-2'],
+    ['done', 'Catalog v2 · 12,792 chunks'],
   ]],
   ['Agent code', [
     ['done', 'Hybrid search · 17/17 · 0.6 s'],
@@ -45,8 +45,8 @@ const GCP = [ // [title, items]
   ]],
   ['Ingestion pipeline', [
     ['done', 'Parser: Gemini + DocAI fallback'],
-    ['wip', 'Chunk + injection (17-18)'],
-    ['todo', 'Queue + Drive sync (19-20)'],
+    ['done', 'Table-aware chunks · 12,792'],
+    ['wip', 'Injection, queue, Drive (18-20)'],
   ]],
 ];
 const SOURCES = [

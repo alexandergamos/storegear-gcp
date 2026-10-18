@@ -44,6 +44,22 @@ Price check: at the same rates one agent answer (~9,900 in / ~138 out tokens) co
 - **Bad / accepted:** slower ingestion (pages in parallel; it runs offline, not in the answer path); two parsers to maintain. Cost is not a downside: ~$3 per full re-ingest against ~$11 with Document AI alone.
 - **Caveats:** the raw-text reference is unreliable on some PDFs (Ignite excerpt: 56 % for both parsers because pypdf glues words), so the threshold is compared per manual, not globally. Prompt changes to the parser are re-tested on the three trap excerpts.
 
+## Addendum (2026-10-18, SMO-17): full run + table-aware chunking
+**Parse:** 10 manuals, ~1,100 pages, 334 batches of 4 pages, 6 in parallel (~2 min per manual). Coverage uses 6-letter shingles with spaces removed, which is immune to PDFs whose raw text glues words together (the word metric gave 56 % on Ignite 2 for both parsers). Average coverage 97.6–98.8 % per manual; **Document AI fallback used on 3 of 334 batches**. Bug found and fixed: pypdf readers are not thread-safe, so batches are cut in one thread and only API calls run in parallel.
+
+**Chunking** (`ingestion/chunk_manuals.py`):
+- **One chunk per table row**, self-contained: `Impermeabilidad: 30 m / (ISO 22810, apto para natación)` for label|value tables, `Modo smartwatch — <col>: <cell>; …` for wide ones. Empty icon columns are dropped; long row groups are capped at their " / " joins.
+- Prose packed to ≤ 600 characters at sentence boundaries, with long run-ons split into 90-word windows.
+- Sections follow headings; boilerplate is skipped by title (n8n rule A5).
+- **Only brand-level sections** (water-resistance policy, safety, care, support, app compatibility: 13 sections) are folded once into "Polar · información común". Device features shared by some Polar models (FuelWise, Running test…) stay per manual: folding them first erased which watch has the feature, and inspection caught it before loading.
+
+**Result:** 12,792 chunks (median 164 characters, max 1,198), 3,338 sections. Loaded into `catalog_*_v2`, evaluated, then swapped live (`infra/sql/003_swap_catalog_v2.sql`; old tables kept as `catalog_*_v1`).
+
+| Catalog | Right manual 1st | All manuals in top 5 | Eval (laptop) | Input tokens per answer |
+|---|---|---|---|---|
+| v1 (n8n export) | 17/17 | 16/17 | 4.95 / 4.91 / 5.00 / 5.00 | ~9,900 |
+| **v2 (Gemini + table-aware)** | 16/17 (Q6's Ignite section 3rd, inside the top 5) | **17/17** | **4.95 / 5.00 / 5.00 / 5.00** | **~5,700 (−43 %)** |
+
 ## Revisit when
 - Full-manual runs show Gemini coverage regularly below the threshold, or its cost is above a few euros per full re-ingest.
 - A Document AI version handles multi-line cells as one row.
