@@ -101,6 +101,9 @@ root_agent = Agent(
     model=Gemini(
         model=os.getenv("STOREGEAR_MODEL", "gemini-3.8-flash"),
         retry_options=types.HttpRetryOptions(attempts=3, initial_delay=0.5, max_delay=2.0),
+        # Pin the endpoint explicitly: inside Agent Runtime the location env vars may point at the physical region,
+        # which doesn't serve gemini-3.8-flash (ADR-001 addendum, ADR-008).
+        client_kwargs={"vertexai": True, "location": os.getenv("STOREGEAR_MODEL_LOCATION", "eu")},
     ),
     description="Asistente de tienda: especificaciones de smartwatches y precio/stock en vivo.",
     instruction=PROMPT,
