@@ -13,6 +13,7 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 | 7 | 2026-10-17 | SMO-12 | Hybrid search tool, contextual embeddings |
 | 8 | 2026-10-17 | SMO-13 | The StoreGear agent: prompt, tools, pre-retrieval |
 | 9 | 2026-10-17 | SMO-14 | Eval gate: from 4.77 to 4.95, and the tail-latency trap |
+| 10 | 2026-10-18 | SMO-15 | Deploy to Agent Runtime: six laptop-vs-cloud surprises |
 
 ---
 
@@ -157,5 +158,21 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Por qué:** un control de regresión que podemos ejecutar en cada cambio y, más adelante, en CI.
 - **Aprendido:** (1) **la latencia de cola es un problema distinto de la latencia mediana.** El endpoint `eu` tiene una mediana de ~2,5 s por llamada, pero algunas llamadas se quedaban en cola 30–190 s, sin ningún 429 visible. Un límite de 15 s con reintentos recorta la cola sin salir de la UE. (2) Más razonamiento es la forma cara de arreglar "paró demasiado pronto"; unas indicaciones precisas son la forma barata. (3) Medir cada paso: las búsquedas tardaban ~1 s, así que el culpable era el modelo.
 - **Siguiente:** SMO-15, desplegar en Agent Runtime y medir allí.
+
+---
+
+## 10 · Deploy to Agent Runtime: six laptop-vs-cloud surprises (SMO-15) — 2026-10-18
+
+### EN
+- **What:** ADR-008 picked Agent Runtime (managed, ADK-native, managed Sessions, idle not billed) in the `eu` multi-region, running as `sg-agent`. Deployed from Python (`infra/deploy_agent_runtime.py`). Cloud results: median **3.0 s** (n8n 9.0 s), cold start ~16 s, price and role filter verified. Eval: 4.86 / 5.00 / 4.95 / 5.00. Q6 is a data gap (a spec table row chunked with GPS text), and its fix is assigned to SMO-17 (Alexander's decision). **Phase 1 closed on 18 Oct, three days early.**
+- **Why:** a managed runtime next to the model endpoint; the platform runs sessions for us.
+- **Learned:** six surprises between laptop and cloud: a bucket in the wrong project; the SDK silently defaulting to us-central1; reserved env var names; the project **number** instead of the ID; metadata tokens ignoring OAuth scopes (Sheets 403); a tool exception killing the turn. Each one is a line in ADR-008. Every fix was explicit configuration rather than a workaround.
+- **Next:** Phase 2, ingestion on Google Cloud, starting with the parser choice (SMO-16).
+
+### ES
+- **Qué:** el ADR-008 eligió Agent Runtime (gestionado, nativo de ADK, sesiones gestionadas, sin coste en reposo) en la multirregión `eu`, ejecutándose como `sg-agent`. Desplegado desde Python (`infra/deploy_agent_runtime.py`). Resultados en la nube: mediana **3,0 s** (n8n 9,0 s), arranque en frío ~16 s, precio y filtro por rol verificados. Eval: 4,86 / 5,00 / 4,95 / 5,00. Q6 es un hueco de datos (una fila de la tabla de especificaciones troceada junto a texto del GPS), y su arreglo queda asignado a SMO-17 (decisión de Alexander). **Fase 1 cerrada el 18-10, tres días antes de plazo.**
+- **Por qué:** un runtime gestionado junto al endpoint del modelo; la plataforma gestiona las sesiones por nosotros.
+- **Aprendido:** seis sorpresas entre el portátil y la nube: un bucket en el proyecto equivocado; el SDK que se iba a us-central1 por defecto sin avisar; nombres de variables de entorno reservados; el **número** de proyecto en lugar del ID; tokens de metadatos que ignoran los scopes de OAuth (403 en Sheets); una excepción de una herramienta que tumbaba el turno. Cada una es una línea del ADR-008. Todos los arreglos fueron configuración explícita, no parches.
+- **Siguiente:** Fase 2, ingesta en Google Cloud, empezando por elegir el parser (SMO-16).
 
 ---

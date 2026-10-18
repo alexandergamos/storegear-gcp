@@ -1,6 +1,6 @@
 # Progress summary
 
-*Updated 2026-10-17 (after SMO-14). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
+*Updated 2026-10-18 (after SMO-15: Phase 1 done). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
 
 ## In one paragraph
 We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and its tables, Spanish search and permissions are live. The catalog is loaded: 9,054 passages from 10 manuals, each with a Google embedding.
@@ -66,10 +66,18 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 | Context / Answer relevance | **5.00 / 5.00** | 5.00 / 5.00 |
 | Median answer time | **6.2 s** | 9.0 s |
 
+### 10. Live in the cloud (SMO-15 · ADR-008) — Phase 1 done
+- **What:** the agent runs on **Agent Runtime** (Agent Platform's managed runtime) in the EU, as the `sg-agent` robot, with managed conversation sessions. Test it from the laptop with `uv run python infra/ask_remote.py "pregunta"`.
+- **Faster than n8n:** median **3.0 s** per answer in the cloud (n8n: 9.0 s), because the runtime sits next to the model. The first question after a quiet period takes ~16 s (cold start).
+- **Verified in the cloud:** specs, comparisons, live price/stock, and the role filter (a manager sees the internal discount policy, staff doesn't).
+- **Eval in the cloud:** 4.86 / 5.00 / 4.95 / 5.00, so correctness is 0.04 short of the gate because of one question (Q6). The cause is in the data: a spec table row chunked with unrelated text. **Fix in SMO-17** (table-aware chunking), decided by you.
+- **Lesson:** six things differed between the laptop and the cloud (wrong project for a bucket, default region, reserved variables, project number vs ID, token scopes, an uncaught tool error). All are documented in ADR-008, which is the "works on my machine" chapter of the thesis.
+
 ## What's next
 | Next | Issue | What happens |
 |---|---|---|
-| 1 | SMO-15 | Deploy to Agent Runtime (or Cloud Run) and measure latency and cost. That completes Phase 1 (due 21 Oct) |
+| 1 | SMO-16 | Phase 2 starts: choose the PDF parser (Document AI vs Gemini) on 3 manuals |
+| 2 | SMO-17 | Table-aware chunking (fixes Q6), injection check, then re-run the gate in the cloud |
 
 ## Numbers to beat (n8n, 2026-10-11)
 Correctness 5.00 · Faithfulness 4.95 · Context 5.00 · Answer 5.00 · median 9.0 s · ~$0.008 per answer.

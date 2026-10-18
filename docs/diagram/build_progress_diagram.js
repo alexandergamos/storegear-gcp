@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const UPDATED = '2026-10-17';
-const HEADLINE = 'Phase 1: eval gate PASSED (4.95 / 4.91 / 5 / 5, median 6.2 s vs n8n 9.0 s) · next SMO-15 deploy';
+const HEADLINE = 'Phase 1 DONE: agent live on Agent Runtime (eu) · median 3.0 s vs n8n 9.0 s · next Phase 2 ingestion';
 
 // ---------------------------------------------------------------- content (edit statuses here)
 const LAPTOP = [
@@ -29,8 +29,8 @@ const GCP = [ // [title, items]
   ]],
   ['Agent Platform (eu endpoint)', [
     ['done', 'Gemini 3.8 Flash · tested'],
-    ['todo', 'Agent Runtime (SMO-15)'],
-    ['todo', 'Sessions + Memory (SMO-24)'],
+    ['done', 'Agent Runtime · eu · 3.0 s'],
+    ['wip', 'Sessions ✓ · Memory (SMO-24)'],
     ['todo', 'Eval + Observability'],
   ]],
   ['Data · Cloud SQL', [
@@ -44,7 +44,7 @@ const GCP = [ // [title, items]
     ['done', 'Eval gate passed · 4.95'],
   ]],
   ['Ingestion pipeline', [
-    ['todo', 'Document AI parse (SMO-16)'],
+    ['wip', 'Document AI parse (SMO-16)'],
     ['todo', 'Chunk + injection (17-18)'],
     ['todo', 'Queue + Drive sync (19-20)'],
   ]],
@@ -57,8 +57,8 @@ const SOURCES = [
 ];
 const PHASES = [
   ['done', 'Phase 0 · Foundations', '15-16 Oct'],
-  ['wip', 'Phase 1 · Working agent', '17-21 Oct'],
-  ['todo', 'Phase 2 · Ingestion', '22-25 Oct'],
+  ['done', 'Phase 1 · Working agent', '17-18 Oct'],
+  ['wip', 'Phase 2 · Ingestion', '22-25 Oct'],
   ['todo', 'Phase 3 · Safety', '26-28 Oct'],
   ['todo', 'Phase 4 · Ops', '29-30 Oct'],
   ['todo', 'Final · n8n vs GCP', '31 Oct'],

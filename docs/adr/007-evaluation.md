@@ -34,6 +34,15 @@ ADR-000's quality bar: on the 22-question eval, each metric ≥ the n8n baseline
 1. **Pre-retrieval guidance** (our block; the n8n system prompt itself is untouched) gained two explicit cases: how-to answers that name a menu must search how to open it; spec figures missing from the results must trigger a search for "<model> especificaciones tecnicas <dato>".
 2. **Tail-latency guard:** the `eu` endpoint has a ~2.5 s median per model call but occasional 30–190 s queueing (measured: `global` stayed under 4.4 s in the same sample). Each call now has a 15 s deadline and up to 3 attempts. The server answers 504, the SDK retries, and slow calls usually land on free capacity. Worst case is about 48 s and then a clean error (handled by the dead-letter queue in Phase 4).
 
+## Addendum (2026-10-18, SMO-15): eval against the deployed agent
+| Run | Corr | Faith | Ctx | Ans | Median |
+|---|---|---|---|---|---|
+| 4 · **cloud (Agent Runtime eu)** | 4.86 | 5.00 | 4.95 | 5.00 | **3.0 s** |
+
+Correctness misses the gate by 0.04, from **Q6 only** (Ignite 2 water resistance, scoring between 3 and 5 across runs).
+**Root cause:** the "30 m" lives in one row of the specs **HTML table** (`<td>Impermeabilidad:</td><td>30 m (ISO 22810…`), chunked together with a long GPS-accuracy paragraph. Vector search sees "GPS accuracy", and keyword search prefers the boilerplate section *"La impermeabilidad al agua de los productos Polar"*, which repeats in every Polar manual (9 of the 15 slots returned for Q6).
+**Decision (Alexander, option A):** close Phase 1 with this documented gap. Fix the cause in **SMO-17** (table-aware chunking: one chunk per spec row with its product header; de-duplicate cross-manual boilerplate), then re-run the gate in the cloud. No hand patch to the data now.
+
 ## Consequences
 - **Good:** quality parity with n8n and 30 % faster median. A repeatable, scripted gate is ready for CI (SMO-28).
 - **Bad / accepted:** the guidance deviates slightly from n8n's text, recorded here. LLM judges have variance: one question can move ±1 between runs. n8n duplicated Q10/Q16 (as Q21/Q22) for that reason.

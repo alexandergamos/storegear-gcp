@@ -92,6 +92,38 @@ async def run_agent(question: str) -> dict:
             "tokens_in": tokens_in, "tokens_out": tokens_out}
 
 
+REMOTE = None  # Agent Runtime handle when --remote
+
+
+def run_agent_remote(question: str) -> dict:
+    """Same record as run_agent, from the DEPLOYED agent. Pre-retrieval runs inside the cloud process, so it is
+    recomputed here with the same search, DB and question (deterministic) to show the judge what the model saw."""
+    session = REMOTE.create_session(user_id="eval", state={"user:role": "staff"})
+    t0 = time.time()
+    answer, searches, calls, tokens_in, tokens_out, errors = "", [], 0, 0, 0, []
+    for ev in REMOTE.stream_query(user_id="eval", session_id=session["id"], message=question):
+        if ev.get("error_code"):
+            errors.append(f"{ev['error_code']}: {ev.get('error_message', '')[:200]}")
+        um = ev.get("usage_metadata") or {}
+        tokens_in += um.get("prompt_token_count") or 0
+        tokens_out += (um.get("candidates_token_count") or 0) + (um.get("thoughts_token_count") or 0)
+        for p in (ev.get("content") or {}).get("parts", []) or []:
+            if p.get("function_call"):
+                calls += 1
+            fr = p.get("function_response")
+            if fr and fr.get("name") == "buscar_catalogo_hibrido":
+                resp = fr.get("response") or {}
+                searches.append(str(resp.get("result", resp)))
+            if p.get("text") and not p.get("thought"):
+                answer += p["text"]
+    latency = round(time.time() - t0, 2)
+    rows = sg.hybrid_search(question, role="staff")
+    pre = sg.PRE_RETRIEVAL.format(results=sg.format_for_agent(rows)) if rows else ""
+    return {"answer": answer.strip() or ("ERROR " + "; ".join(errors)), "latency_s": latency, "tool_calls": calls,
+            "extra_searches": len(searches), "pre_retrieval": pre, "searches": searches,
+            "tokens_in": tokens_in, "tokens_out": tokens_out}
+
+
 def build_context(run: dict, question: str) -> str:
     parts = []
     if run["pre_retrieval"]:
@@ -107,7 +139,7 @@ def main(only: list[int]) -> None:
         qs = [q for q in qs if q["qid"] in only]
     results = []
     for q in qs:
-        run = asyncio.run(run_agent(q["question"]))
+        run = run_agent_remote(q["question"]) if REMOTE else asyncio.run(run_agent(q["question"]))
         fill = lambda t: t.replace("{{question}}", q["question"]).replace("{{category}}", q["category"])  # noqa: E731
         corr = ask_judge(fill(corr_prompt) + f"\n\nRespuesta esperada:\n{q['expected_answer']}\n\nRespuesta real:\n{run['answer']}", CORRECTNESS_SCHEMA)
         ctx = build_context(run, q["question"])
@@ -142,4 +174,13 @@ def main(only: list[int]) -> None:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", type=int, nargs="*", default=[])
-    main(ap.parse_args().only)
+    ap.add_argument("--remote", action="store_true", help="evaluate the agent deployed on Agent Runtime")
+    args = ap.parse_args()
+    if args.remote:
+        import warnings
+        import vertexai
+        warnings.filterwarnings("ignore")
+        st = json.loads((ROOT / "infra" / "agent_runtime.json").read_text())
+        REMOTE = vertexai.Client(project="storegear-prod-ag26", location=st["location"]).agent_engines.get(name=st["resource_name"])
+        print("evaluating DEPLOYED agent:", st["resource_name"])
+    main(args.only)

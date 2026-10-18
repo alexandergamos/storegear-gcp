@@ -1,6 +1,6 @@
 # ADR-008 — Runtime: Agent Runtime (eu) with the sg-agent service account
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-18)
 - **Date:** 2026-10-18
 - **Linear:** SMO-15
 - **Deciders:** Alexander (decides) · Claude (drafts)
@@ -17,7 +17,7 @@ The agent passes the eval gate locally (ADR-007) and now needs to run in Google 
 
 Compute prices are near-identical between Agent Runtime and Cloud Run, so the choice is about how much the platform manages for us.
 
-## Decision (proposed)
+## Decision
 - **Agent Runtime, location `eu`** (EU multi-region). Inside the runtime the SDK uses the deploy location for model calls. `europe-west1` doesn't serve Gemini 3.8 Flash or `gemini-embedding-2`, while `eu` serves both, plus Sessions and Memory Bank, under the same EU jurisdiction (ADR-001 addendum).
 - **Identity: our `sg-agent` service account** (`service_account` in the deploy config), not the new Agent Identity. It already has the right Cloud SQL IAM user and Sheet share. The env var `STOREGEAR_DB_USER` names its DB user explicitly.
 - **Packaging:** deploy from object (`AdkApp`) with our `storegear` package as `extra_packages`. Requirements are pinned to what we run locally. Staging bucket `gs://storegear-prod-ag26-agent-staging` (EU).
@@ -31,6 +31,24 @@ Compute prices are near-identical between Agent Runtime and Cloud Run, so the ch
   - Pickled deploys must import cleanly in the runtime. The DB and genai clients are created lazily on first use, never at import.
   - The 90 queries/min quota is fine for one shop.
   - The 15 s model timeout and retries from ADR-007 travel with the agent.
+
+## Verified (2026-10-18)
+Deployed as `projects/1066603052728/locations/eu/reasoningEngines/1557471414884237312` (`infra/agent_runtime.json`).
+- 22-question eval against the deployed agent: Corr 4.86 · Faith 5.00 · Ctx 4.95 · Ans 5.00 · **median 3.0 s** (laptop 6.2 s, n8n 9.0 s). The runtime sits next to the model endpoint. Q6 is a known data gap (ADR-007 addendum).
+- First call after idle: ~16 s (cold start, min_instances = 0).
+- Price/stock live from the cloud ✅. Role filter in the cloud: a manager sees the internal discount policy, staff gets "no tengo esa información" ✅.
+
+## Laptop vs cloud: what broke on the way (the most useful part of this ADR)
+| Symptom | Cause | Fix |
+|---|---|---|
+| Deploy: `storage.objects.get` denied | The staging bucket was created in the **wrong project** (Console top bar) | Recreated in StoreGear; always check the project picker |
+| `The ReasoningEngine does not exist` on first session | `AdkApp` captured **us-central1** (no `vertexai.init`); `init(location="eu")` is rejected by this SDK; `GOOGLE_CLOUD_AGENT_ENGINE_*` env vars are **reserved** | Explicit `session_service_builder` → `VertexAiSessionService(location="eu")` (endpoint `aiplatform.eu.rep.googleapis.com`) |
+| (prevented) model calls leaving `eu` | Same location ambiguity | Model pinned with ADK `Gemini(client_kwargs={"location": "eu"})` |
+| `The Cloud SQL instance does not exist` | In the runtime `GOOGLE_CLOUD_PROJECT` is the project **number**; Cloud SQL needs the **ID** | `STOREGEAR_PROJECT_ID` env var |
+| Sheets 403 | Runtime (metadata) tokens carry only `cloud-platform` and ignore requested scopes | Self-impersonation for a `spreadsheets`-scoped token; `sg-agent` = Token Creator on itself |
+| A tool error crashed the whole turn | Exception propagated | Tools return errors as data; the model answers gracefully |
+
+Also: `vertexai.Client` is deprecated in favour of `agentplatform.Client`, which renames `agent_engines` to `runtimes`. Migration is in the backlog.
 
 ## Revisit when
 - Cold starts hurt real users: set `min_instances=1` and price it.
