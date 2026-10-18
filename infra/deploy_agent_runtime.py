@@ -36,6 +36,7 @@ ENV = {
     "STOREGEAR_THINKING": "low",
     "STOREGEAR_MODEL_TIMEOUT_MS": "15000",
     "STOREGEAR_EMBED_LOCATION": "eu",
+    "STOREGEAR_SHEETS_SA": SA,  # self-impersonation for a spreadsheets-scoped token (metadata tokens lack it)
     "STOREGEAR_PROJECT_ID": PROJECT,  # the runtime's GOOGLE_CLOUD_PROJECT is the project number
     "STOREGEAR_DB_USER": f"sg-agent@{PROJECT}.iam",  # runtime credentials don't expose the SA email until refreshed
 }

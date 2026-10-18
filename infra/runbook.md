@@ -156,3 +156,14 @@ uv run python eval/run_eval.py              # 22 questions, ~10 min, a few cents
 uv run python eval/run_eval.py --only 6 13  # subset while iterating
 ```
 Gate: every metric ≥ n8n baseline − 0.1 (Corr 4.90 · Faith 4.85 · Ctx 4.90 · Ans 4.90).
+
+## SMO-15 · Agent Runtime deploy (2026-10-18; ADR-008)
+Prerequisites (Console, project **StoreGear** selected in the top bar):
+- Bucket `storegear-prod-ag26-agent-staging` (multi-region EU, uniform access) **in the StoreGear project**; `sg-agent` = Storage Object Viewer on it.
+- `sg-agent` = **Service Account Token Creator on itself** (scoped token for the Sheets API inside the runtime):
+  `gcloud iam service-accounts add-iam-policy-binding sg-agent@$PROJECT_ID.iam.gserviceaccount.com --member="serviceAccount:sg-agent@$PROJECT_ID.iam.gserviceaccount.com" --role=roles/iam.serviceAccountTokenCreator`
+```bash
+uv run python infra/deploy_agent_runtime.py            # first time
+uv run python infra/deploy_agent_runtime.py --update   # later (same resource, infra/agent_runtime.json)
+uv run python infra/ask_remote.py "pregunta"           # test the deployed agent
+```
