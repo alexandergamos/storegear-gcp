@@ -167,3 +167,12 @@ uv run python infra/deploy_agent_runtime.py            # first time
 uv run python infra/deploy_agent_runtime.py --update   # later (same resource, infra/agent_runtime.json)
 uv run python infra/ask_remote.py "pregunta"           # test the deployed agent
 ```
+
+## SMO-16 · Document AI (2026-10-18, Console; ADR-009)
+```bash
+gcloud services enable documentai.googleapis.com --project $PROJECT_ID
+# Processor: Console → Document AI → Processor gallery → Layout Parser → name sg-layout-parser, region eu
+# ID: 8a9ba69484bf2664 · endpoint https://eu-documentai.googleapis.com
+uv run python ingestion/parser_test.py gemini
+uv run python ingestion/parser_test.py docai --processor 8a9ba69484bf2664
+```

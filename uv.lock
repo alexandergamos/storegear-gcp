@@ -543,6 +543,22 @@ wheels = [
 ]
 
 [[package]]
+name = "google-cloud-documentai"
+version = "3.16.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-api-core", extra = ["grpc"] },
+    { name = "google-auth" },
+    { name = "grpcio" },
+    { name = "proto-plus" },
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/77/57/fcb7cb904c9d4a39953ccc798e2bce5d260171142ba41467fdf2cb29e090/google_cloud_documentai-3.16.0.tar.gz", hash = "sha256:b9988746f8eb95aa7fee13c5812a9e3573d1b9322bc7f54b40efe9ab7a9281fd", size = 360531, upload-time = "2026-10-01T18:16:21.535Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5c/a4/6c9236d57b8bda960dee6d7f809f80f89039f075bde1d9be66b887a09397/google_cloud_documentai-3.16.0-py3-none-any.whl", hash = "sha256:8b2feabd8ea266e68d9a32e60f3d6cc48d940b8c8150215e6ee5f409264bd12a", size = 309115, upload-time = "2026-10-01T18:10:01.246Z" },
+]
+
+[[package]]
 name = "google-cloud-logging"
 version = "3.17.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1146,6 +1162,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pypdf"
+version = "6.21.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/51/e1/32a9c4dbd94618145f8bab5c623bdb0a528f23fc8719afd77ba0278fd377/pypdf-6.21.1.tar.gz", hash = "sha256:2d62c383acd6e0dff0a96322ba8b1135229343b084d73c6f6cfd947fd291afcb", size = 7088597, upload-time = "2026-10-17T10:29:52.801Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/85/e6/24c944e473c34e818cf1b98085796fcd780465ecfe17663f2bf8fee1958b/pypdf-6.21.1-py3-none-any.whl", hash = "sha256:553e2d42f5bb3bb2a785a7d3de8ef90bb7df74b5413eff5a7b4388007ea9254b", size = 405134, upload-time = "2026-10-17T10:29:50.687Z" },
+]
+
+[[package]]
 name = "python-dateutil"
 version = "2.9.0.post0"
 source = { registry = "https://pypi.org/simple" }
@@ -1330,9 +1355,15 @@ dependencies = [
     { name = "cloud-sql-python-connector", extra = ["pg8000"] },
     { name = "google-adk" },
     { name = "google-cloud-aiplatform", extra = ["adk", "agent-engines"] },
+    { name = "google-cloud-documentai" },
     { name = "google-cloud-secret-manager" },
     { name = "numpy" },
     { name = "sqlalchemy" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pypdf" },
 ]
 
 [package.metadata]
@@ -1340,10 +1371,14 @@ requires-dist = [
     { name = "cloud-sql-python-connector", extras = ["pg8000"], specifier = ">=1.23.0" },
     { name = "google-adk", specifier = ">=2.0" },
     { name = "google-cloud-aiplatform", extras = ["adk", "agent-engines"], specifier = ">=1.112" },
+    { name = "google-cloud-documentai", specifier = ">=3.16.0" },
     { name = "google-cloud-secret-manager", specifier = ">=2.31.0" },
     { name = "numpy", specifier = ">=2.5.4" },
     { name = "sqlalchemy", specifier = ">=2.1.5" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pypdf", specifier = ">=6.21.1" }]
 
 [[package]]
 name = "tenacity"
