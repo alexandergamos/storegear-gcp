@@ -30,10 +30,7 @@ REQUIREMENTS = [
     "cloudpickle>=3.1",
 ]
 ENV = {
-    # The ADK template picks the Sessions + model location from these (before its own default, us-central1).
-    # vertexai.init(location="eu") would be the normal way, but this SDK's region check still rejects "eu".
-    "GOOGLE_CLOUD_AGENT_ENGINE_LOCATION": LOCATION,
-    "GOOGLE_CLOUD_LOCATION": LOCATION,
+    "GOOGLE_CLOUD_LOCATION": LOCATION,  # model calls (GOOGLE_CLOUD_AGENT_ENGINE_* names are reserved by the runtime)
     "GOOGLE_GENAI_USE_VERTEXAI": "TRUE",
     "STOREGEAR_MODEL": "gemini-3.8-flash",
     "STOREGEAR_THINKING": "low",
@@ -50,6 +47,11 @@ def main(update: bool) -> None:
 
     client = vertexai.Client(project=PROJECT, location=LOCATION)
     app = agent_engines.AdkApp(agent=root_agent)
+    # The template takes project/location from vertexai.init() and uses them in the runtime for Sessions and models.
+    # vertexai.init(location="eu") is rejected by this SDK's region check, and the runtime reserves the
+    # GOOGLE_CLOUD_AGENT_ENGINE_* env vars, so set the captured values directly (otherwise: us-central1 -> 404).
+    app._tmpl_attrs["project"] = PROJECT
+    app._tmpl_attrs["location"] = LOCATION
     config = {
         "display_name": "storegear-agent",
         "description": "StoreGear Assistant: smartwatch manuals + live price/stock (ADK, Gemini 3.8 Flash)",
