@@ -11,7 +11,7 @@ import os
 import sys
 from pathlib import Path
 
-import agentplatform  # new name of the vertexai client (Agent Platform rename)
+import vertexai  # deprecated name; agentplatform.Client renames agent_engines -> runtimes (migrate later)
 from vertexai import agent_engines  # AdkApp still lives here in aiplatform 2.5
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,7 +44,7 @@ def main(update: bool) -> None:
     sys.path.insert(0, str(ROOT / "agent"))
     from storegear.agent import root_agent
 
-    client = agentplatform.Client(project=PROJECT, location=LOCATION)
+    client = vertexai.Client(project=PROJECT, location=LOCATION)
     app = agent_engines.AdkApp(agent=root_agent)
     config = {
         "display_name": "storegear-agent",
