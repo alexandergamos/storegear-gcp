@@ -37,10 +37,14 @@ Reglas:
 
 
 def parse_gemini(pdf: Path) -> str:
+    return parse_gemini_bytes(pdf.read_bytes())
+
+
+def parse_gemini_bytes(data: bytes) -> str:
     client = genai.Client(vertexai=True, project=PROJECT, location="eu")
     r = client.models.generate_content(
         model="gemini-3.8-flash",
-        contents=[types.Part.from_bytes(data=pdf.read_bytes(), mime_type="application/pdf"), GEMINI_PROMPT],
+        contents=[types.Part.from_bytes(data=data, mime_type="application/pdf"), GEMINI_PROMPT],
         config=types.GenerateContentConfig(temperature=0, thinking_config=types.ThinkingConfig(thinking_level="low")))
     return r.text
 

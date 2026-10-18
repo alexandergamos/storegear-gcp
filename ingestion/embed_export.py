@@ -77,9 +77,11 @@ def embed_texts(model: str, texts: list[str], task: str, workers: int = 12) -> n
 
 if __name__ == "__main__":
     model = sys.argv[1]
-    chunks = load_chunks()
+    src = sys.argv[2] if len(sys.argv) > 2 else "data/catalog_chunks.csv"   # v2: data/catalog_v2/chunks.csv
+    tag = model + ("_v2" if "catalog_v2" in src else "")
+    chunks = load_chunks(src)
     print(f"{model}: embedding {len(chunks)} chunks")
     vecs = embed_texts(model, [c["text"] for c in chunks], "RETRIEVAL_DOCUMENT")
-    np.save(f"data/emb_{model}.npy", vecs)
-    json.dump([c["child_id"] for c in chunks], open(f"data/emb_{model}.ids.json", "w"))
-    print(f"saved data/emb_{model}.npy {vecs.shape}")
+    np.save(f"data/emb_{tag}.npy", vecs)
+    json.dump([c["child_id"] for c in chunks], open(f"data/emb_{tag}.ids.json", "w"))
+    print(f"saved data/emb_{tag}.npy {vecs.shape}")

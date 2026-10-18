@@ -38,6 +38,8 @@ EMBED_MODEL = os.getenv("STOREGEAR_EMBED_MODEL", "gemini-embedding-2")  # ADR-00
 EMBED_LOCATION = os.getenv("STOREGEAR_EMBED_LOCATION", "eu")
 TOP_K = 8                  # n8n topK
 FETCH_K = TOP_K * 3        # candidates per branch (dense / keyword)
+# Which catalog tables to read: "" = live, "_v2" = the re-parsed side tables under evaluation (SMO-17).
+CATALOG_SUFFIX = os.getenv("STOREGEAR_CATALOG_SUFFIX", "")
 RETURN_N = 5               # parents handed to the model
 MAX_PER_MANUAL = 3         # diversity: a comparison ("A vs B") must not get 5 sections of A
 SCOPES = ["https://www.googleapis.com/auth/sqlservice.login", "https://www.googleapis.com/auth/cloud-platform"]
@@ -167,7 +169,8 @@ def hybrid_search(query: str, role: str = "staff", top_n: int = RETURN_N) -> lis
     role = role if role in ("staff", "manager") else "staff"
     qv = "[" + ",".join(f"{x:.7f}" for x in embed_query(query)) + "]"
     with engine().connect() as conn:
-        rows = conn.execute(sqlalchemy.text(HYBRID_SQL), {"qv": qv, "qt": query, "k": FETCH_K, "role": role}).mappings().all()
+        sql = HYBRID_SQL.replace("catalog_chunks", f"catalog_chunks{CATALOG_SUFFIX}").replace("catalog_parents", f"catalog_parents{CATALOG_SUFFIX}")
+        rows = conn.execute(sqlalchemy.text(sql), {"qv": qv, "qt": query, "k": FETCH_K, "role": role}).mappings().all()
     return diversify([dict(r) for r in rows], top_n)
 
 

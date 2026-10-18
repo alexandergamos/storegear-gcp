@@ -22,7 +22,7 @@ SCOPES = ["https://www.googleapis.com/auth/sqlservice.login", "https://www.googl
 BATCH = 200
 
 UPSERT_CHUNKS = """
-INSERT INTO catalog_chunks (child_id, parent_id, file_id, file_name, header_path, chunk_text,
+INSERT INTO catalog_chunks{S} (child_id, parent_id, file_id, file_name, header_path, chunk_text,
                             product_category, access_level, embedding, updated_at)
 SELECT * , now() FROM unnest(%s::text[], %s::text[], %s::text[], %s::text[], %s::text[], %s::text[],
                              %s::text[], %s::text[], %s::vector[])
@@ -33,7 +33,7 @@ ON CONFLICT (child_id) DO UPDATE SET
   embedding = EXCLUDED.embedding, updated_at = now()
 """
 UPSERT_PARENTS = """
-INSERT INTO catalog_parents (parent_id, file_id, header_path, parent_context, updated_at)
+INSERT INTO catalog_parents{S} (parent_id, file_id, header_path, parent_context, updated_at)
 SELECT *, now() FROM unnest(%s::text[], %s::text[], %s::text[], %s::text[])
 ON CONFLICT (parent_id) DO UPDATE SET
   file_id = EXCLUDED.file_id, header_path = EXCLUDED.header_path,
@@ -47,11 +47,12 @@ def read_csv(path: str) -> list[dict]:
         return list(csv.DictReader(fh))
 
 
-def main(model: str) -> None:
-    chunks = read_csv("data/catalog_chunks.csv")
-    parents = read_csv("data/catalog_parents.csv")
-    vecs = np.load(f"data/emb_{model}.npy")
-    ids = json.load(open(f"data/emb_{model}.ids.json"))
+def main(model: str, v2: bool) -> None:
+    suffix = "_v2" if v2 else ""
+    chunks = read_csv("data/catalog_v2/chunks.csv" if v2 else "data/catalog_chunks.csv")
+    parents = read_csv("data/catalog_v2/parents.csv" if v2 else "data/catalog_parents.csv")
+    vecs = np.load(f"data/emb_{model}{suffix}.npy")
+    ids = json.load(open(f"data/emb_{model}{suffix}.ids.json"))
     assert ids == [c["child_id"] for c in chunks], "embedding file doesn't match the CSV order"
     as_vec = lambda v: "[" + ",".join(f"{x:.7f}" for x in v) + "]"  # noqa: E731  pgvector text format
 
@@ -63,12 +64,12 @@ def main(model: str) -> None:
         cur = conn.cursor()
         for i in range(0, len(parents), BATCH):
             b = parents[i:i + BATCH]
-            cur.execute(UPSERT_PARENTS, ([p["parent_id"] for p in b], [p["file_id"] for p in b],
+            cur.execute(UPSERT_PARENTS.replace('{S}', suffix), ([p["parent_id"] for p in b], [p["file_id"] for p in b],
                                          [p["header_path"] for p in b], [p["parent_context"] for p in b]))
         print(f"parents: {len(parents)} upserted")
         for i in range(0, len(chunks), BATCH):
             b, v = chunks[i:i + BATCH], vecs[i:i + BATCH]
-            cur.execute(UPSERT_CHUNKS, (
+            cur.execute(UPSERT_CHUNKS.replace('{S}', suffix), (
                 [c["child_id"] for c in b], [c["parent_id"] for c in b], [c["file_id"] for c in b],
                 [c["file_name"] for c in b], [c["header_path"] for c in b], [c["chunk_text"] for c in b],
                 [c["product_category"] or None for c in b], [c["access_level"] or "staff" for c in b],
@@ -76,14 +77,14 @@ def main(model: str) -> None:
             if (i // BATCH) % 10 == 0:
                 print(f"  chunks {i + len(b)}/{len(chunks)} · {time.time() - t0:.0f}s")
         conn.commit()
-        cur.execute("SELECT count(*), count(embedding), count(DISTINCT parent_id) FROM catalog_chunks")
+        cur.execute(f"SELECT count(*), count(embedding), count(DISTINCT parent_id) FROM catalog_chunks{suffix}")
         n, n_emb, n_par = cur.fetchone()
-        cur.execute("SELECT count(*) FROM catalog_chunks c WHERE NOT EXISTS "
-                    "(SELECT 1 FROM catalog_parents p WHERE p.parent_id = c.parent_id)")
+        cur.execute(f"SELECT count(*) FROM catalog_chunks{suffix} c WHERE NOT EXISTS "
+                    f"(SELECT 1 FROM catalog_parents{suffix} p WHERE p.parent_id = c.parent_id)")
         orphans = cur.fetchone()[0]
         print(f"done in {time.time() - t0:.0f}s · chunks {n} · with embedding {n_emb} · parents {n_par} · orphans {orphans}")
         conn.close()
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(sys.argv[1], "--v2" in sys.argv)
