@@ -11,7 +11,7 @@ import json
 import time
 from pathlib import Path
 
-import vertexai
+import agentplatform
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = json.loads((ROOT / "infra" / "agent_runtime.json").read_text())
@@ -33,7 +33,7 @@ async def ask(remote, question: str, role: str) -> float:
 
 
 async def main(questions: list[str], role: str) -> None:
-    client = vertexai.Client(project="storegear-prod-ag26", location=STATE["location"])
+    client = agentplatform.Client(project="storegear-prod-ag26", location=STATE["location"])
     remote = client.agent_engines.get(name=STATE["resource_name"])
     for q in questions:
         await ask(remote, q, role)

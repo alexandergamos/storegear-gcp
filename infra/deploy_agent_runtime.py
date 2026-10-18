@@ -11,8 +11,8 @@ import os
 import sys
 from pathlib import Path
 
-import vertexai
-from vertexai import agent_engines
+import agentplatform  # new name of the vertexai client (Agent Platform rename)
+from vertexai import agent_engines  # AdkApp still lives here in aiplatform 2.5
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = "storegear-prod-ag26"
@@ -26,6 +26,8 @@ REQUIREMENTS = [
     "google-adk>=2.0",
     "cloud-sql-python-connector[pg8000]>=1.23.0",
     "sqlalchemy>=2.0",
+    "pydantic>=2.14",       # needed by the runtime to unpickle the app (SDK warns if missing)
+    "cloudpickle>=3.1",
 ]
 ENV = {
     "GOOGLE_GENAI_USE_VERTEXAI": "TRUE",
@@ -42,7 +44,7 @@ def main(update: bool) -> None:
     sys.path.insert(0, str(ROOT / "agent"))
     from storegear.agent import root_agent
 
-    client = vertexai.Client(project=PROJECT, location=LOCATION)
+    client = agentplatform.Client(project=PROJECT, location=LOCATION)
     app = agent_engines.AdkApp(agent=root_agent)
     config = {
         "display_name": "storegear-agent",
