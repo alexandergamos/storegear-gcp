@@ -30,6 +30,10 @@ REQUIREMENTS = [
     "cloudpickle>=3.1",
 ]
 ENV = {
+    # The ADK template picks the Sessions + model location from these (before its own default, us-central1).
+    # vertexai.init(location="eu") would be the normal way, but this SDK's region check still rejects "eu".
+    "GOOGLE_CLOUD_AGENT_ENGINE_LOCATION": LOCATION,
+    "GOOGLE_CLOUD_LOCATION": LOCATION,
     "GOOGLE_GENAI_USE_VERTEXAI": "TRUE",
     "STOREGEAR_MODEL": "gemini-3.8-flash",
     "STOREGEAR_THINKING": "low",
@@ -44,9 +48,6 @@ def main(update: bool) -> None:
     sys.path.insert(0, str(ROOT / "agent"))
     from storegear.agent import root_agent
 
-    # AdkApp captures project/location from vertexai.init() and the runtime uses them for Sessions and model calls.
-    # Without this it silently defaults to us-central1 ("The ReasoningEngine does not exist" on first session).
-    vertexai.init(project=PROJECT, location=LOCATION, staging_bucket=STAGING)
     client = vertexai.Client(project=PROJECT, location=LOCATION)
     app = agent_engines.AdkApp(agent=root_agent)
     config = {
