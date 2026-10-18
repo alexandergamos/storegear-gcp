@@ -1,6 +1,6 @@
 # ADR-009 — Document parsing: Gemini 3.8 Flash, with a coverage check and Document AI as fallback
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-18)
 - **Date:** 2026-10-18
 - **Linear:** SMO-16
 - **Deciders:** Alexander (decides) · Claude (drafts and tests)
@@ -33,7 +33,7 @@ Price check: at the same rates one agent answer (~9,900 in / ~138 out tokens) co
 | Both, combined | Each page parsed by Gemini, verified against Document AI or raw text | More moving parts |
 | LlamaParse (n8n) | Known | Third party, outside ADR-000; dropped table lines (A20) |
 
-## Decision (proposed)
+## Decision
 **Gemini 3.8 Flash as the primary parser, in batches of a few pages, with an automatic coverage check:**
 1. Each batch of pages is parsed by Gemini with the tested prompt (copy verbatim, tables as Markdown, multi-line cells joined with " / ").
 2. **Coverage check:** compare the Gemini text's words with the page's raw text (pypdf). Below a threshold (start at 95 %) the batch is re-parsed with **Document AI Layout Parser**, and the fallback is logged.

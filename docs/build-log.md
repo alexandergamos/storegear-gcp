@@ -14,6 +14,7 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 | 8 | 2026-10-17 | SMO-13 | The StoreGear agent: prompt, tools, pre-retrieval |
 | 9 | 2026-10-17 | SMO-14 | Eval gate: from 4.77 to 4.95, and the tail-latency trap |
 | 10 | 2026-10-18 | SMO-15 | Deploy to Agent Runtime: six laptop-vs-cloud surprises |
+| 11 | 2026-10-18 | SMO-16 | Parser bake-off: Gemini vs Document AI |
 
 ---
 
@@ -174,5 +175,21 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Por qué:** un runtime gestionado junto al endpoint del modelo; la plataforma gestiona las sesiones por nosotros.
 - **Aprendido:** seis sorpresas entre el portátil y la nube: un bucket en el proyecto equivocado; el SDK que se iba a us-central1 por defecto sin avisar; nombres de variables de entorno reservados; el **número** de proyecto en lugar del ID; tokens de metadatos que ignoran los scopes de OAuth (403 en Sheets); una excepción de una herramienta que tumbaba el turno. Cada una es una línea del ADR-008. Todos los arreglos fueron configuración explícita, no parches.
 - **Siguiente:** Fase 2, ingesta en Google Cloud, empezando por elegir el parser (SMO-16).
+
+---
+
+## 11 · Parser bake-off: Gemini vs Document AI (SMO-16) — 2026-10-18
+
+### EN
+- **What:** Document AI API enabled; Layout Parser processor `sg-layout-parser` (eu, `8a9ba69484bf2664`). Gemini 3.8 Flash and Layout Parser compared on 3 trap excerpts (`ingestion/parser_test.py`): both kept 9/9 traps. Gemini keeps multi-line cells in one labelled row and gives clean text; Layout Parser splits some cells into label-less rows and has OCR glitches, but it's 2–5× faster and deterministic. Word coverage 97–100 % for both. ADR-009 accepted: Gemini first, a coverage check, Document AI fallback below 95 %.
+- **Why:** retrieval quality starts at parsing; Q6 fails because a table row lost its label.
+- **Learned:** "the specialised service is cheaper" was an assumption, and it was wrong. Measured: Gemini ≈ $2.6 per 1,000 pages vs Document AI $10. The per-answer price check matches n8n's Langfuse cost. Alexander asked the question that exposed it. A 9/9 tie on traps still hid a real difference in table structure: read the outputs, not just the score.
+- **Next:** SMO-17, re-parse and chunk tables row by row, then re-run the cloud eval for Q6.
+
+### ES
+- **Qué:** API de Document AI activada; procesador Layout Parser `sg-layout-parser` (eu, `8a9ba69484bf2664`). Gemini 3.8 Flash y Layout Parser comparados en 3 fragmentos con trampas (`ingestion/parser_test.py`): los dos conservaron 9/9. Gemini mantiene las celdas de varias líneas en una sola fila con su etiqueta y da texto limpio; Layout Parser parte algunas celdas en filas sin etiqueta y tiene errores de OCR, pero es 2–5× más rápido y determinista. Cobertura de palabras del 97–100 % en ambos. ADR-009 aceptado: Gemini primero, comprobación de cobertura y Document AI como respaldo por debajo del 95 %.
+- **Por qué:** la calidad de la búsqueda empieza al leer el PDF; Q6 falla porque una fila de tabla perdió su etiqueta.
+- **Aprendido:** «el servicio especializado es más barato» era una suposición, y era falsa. Medido: Gemini ≈ 2,6 $ por 1.000 páginas frente a 10 $ de Document AI. La comprobación de precio por respuesta cuadra con el coste de Langfuse en n8n. La pregunta que lo destapó la hizo Alexander. Un empate 9/9 en las trampas escondía una diferencia real en la estructura de las tablas: hay que leer los resultados, no solo la nota.
+- **Siguiente:** SMO-17, volver a leer los PDFs y trocear las tablas fila a fila; después repetir el eval en la nube para Q6.
 
 ---

@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const UPDATED = '2026-10-17';
-const HEADLINE = 'Phase 1 DONE: agent live on Agent Runtime (eu) · median 3.0 s vs n8n 9.0 s · next Phase 2 ingestion';
+const HEADLINE = 'Phase 1 done · Phase 2: parser chosen (SMO-16, Gemini + Document AI fallback) · next SMO-17 table-aware chunking (fixes Q6)';
 
 // ---------------------------------------------------------------- content (edit statuses here)
 const LAPTOP = [
@@ -44,8 +44,8 @@ const GCP = [ // [title, items]
     ['done', 'Eval gate passed · 4.95'],
   ]],
   ['Ingestion pipeline', [
-    ['wip', 'Document AI parse (SMO-16)'],
-    ['todo', 'Chunk + injection (17-18)'],
+    ['done', 'Parser: Gemini + DocAI fallback'],
+    ['wip', 'Chunk + injection (17-18)'],
     ['todo', 'Queue + Drive sync (19-20)'],
   ]],
 ];

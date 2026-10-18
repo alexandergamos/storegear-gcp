@@ -1,6 +1,6 @@
 # Progress summary
 
-*Updated 2026-10-18 (after SMO-15: Phase 1 done). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
+*Updated 2026-10-18 (after SMO-16). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
 
 ## In one paragraph
 We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and its tables, Spanish search and permissions are live. The catalog is loaded: 9,054 passages from 10 manuals, each with a Google embedding.
@@ -73,11 +73,16 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 - **Eval in the cloud:** 4.86 / 5.00 / 4.95 / 5.00, so correctness is 0.04 short of the gate because of one question (Q6). The cause is in the data: a spec table row chunked with unrelated text. **Fix in SMO-17** (table-aware chunking), decided by you.
 - **Lesson:** six things differed between the laptop and the cloud (wrong project for a bucket, default region, reserved variables, project number vs ID, token scopes, an uncaught tool error). All are documented in ADR-008, which is the "works on my machine" chapter of the thesis.
 
+### 11. Reading the PDFs (SMO-16 · ADR-009) — Phase 2 started
+- **What:** a test of two "parsers" (tools that turn a PDF into structured text) on three excerpts with known traps: the Ignite 2 "30 m" row (Q6), the Instinct 3 battery cell that LlamaParse dropped in n8n, and the Suunto battery modes.
+- **Result:** both kept 9/9 traps. **Gemini 3.8 Flash** keeps every multi-line table cell in one row next to its label; **Document AI Layout Parser** splits some into label-less rows (the Q6 failure pattern) and adds OCR glitches, but it's faster and deterministic.
+- **Cost, measured:** Gemini ≈ $2.6 per 1,000 pages (≈ $2.8 for the whole catalog) vs Document AI $10 (≈ $11). You questioned the first assumption, and measuring showed it was wrong.
+- **Decision (you):** Gemini parses, an automatic coverage check compares its text with the PDF, and Document AI re-parses any batch below 95 %.
+
 ## What's next
 | Next | Issue | What happens |
 |---|---|---|
-| 1 | SMO-16 | Phase 2 starts: choose the PDF parser (Document AI vs Gemini) on 3 manuals |
-| 2 | SMO-17 | Table-aware chunking (fixes Q6), injection check, then re-run the gate in the cloud |
+| 1 | SMO-17 | Table-aware chunking (fixes Q6), injection check, then re-run the gate in the cloud |
 
 ## Numbers to beat (n8n, 2026-10-11)
 Correctness 5.00 · Faithfulness 4.95 · Context 5.00 · Answer 5.00 · median 9.0 s · ~$0.008 per answer.
