@@ -34,9 +34,13 @@ def _sheets() -> AuthorizedSession:
 
 def lookup_price_stock(file_id: str) -> dict:
     url = f"https://sheets.googleapis.com/v4/spreadsheets/{SHEET_ID}/values/{TAB}"
-    r = _sheets().get(url, timeout=10)
-    r.raise_for_status()
-    rows = r.json().get("values", [])
+    try:
+        r = _sheets().get(url, timeout=10)
+        r.raise_for_status()
+        rows = r.json().get("values", [])
+    except Exception as e:  # noqa: BLE001  a tool failure must reach the model as data, not crash the turn
+        print(f"[price] sheet read failed: {type(e).__name__}: {str(e)[:200]}")
+        return {"status": "error", "message": "No se ha podido consultar la hoja de precios en este momento."}
     if not rows:
         return {"status": "error", "message": "price sheet is empty"}
     header, data = rows[0], rows[1:]
