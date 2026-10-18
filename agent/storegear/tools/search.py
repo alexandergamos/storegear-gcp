@@ -29,7 +29,9 @@ from google.auth import impersonated_credentials
 from google.cloud.sql.connector import Connector
 from google.genai import types
 
-PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "storegear-prod-ag26")
+# Project ID (not number): Agent Runtime sets GOOGLE_CLOUD_PROJECT to the project NUMBER, and Cloud SQL
+# connection names require the ID ("The Cloud SQL instance does not exist" otherwise).
+PROJECT = os.getenv("STOREGEAR_PROJECT_ID", "storegear-prod-ag26")
 INSTANCE = os.getenv("STOREGEAR_DB_INSTANCE", f"{PROJECT}:europe-west1:sg-catalog")
 DATABASE = os.getenv("STOREGEAR_DB_NAME", "storegear")
 EMBED_MODEL = os.getenv("STOREGEAR_EMBED_MODEL", "gemini-embedding-2")  # ADR-005
