@@ -189,3 +189,13 @@ STOREGEAR_CATALOG_SUFFIX=_v2 uv run python eval/run_eval.py
 uv run python infra/sql/apply.py infra/sql/003_swap_catalog_v2.sql    # one transaction; v1 kept as catalog_*_v1
 # Rollback: the same four renames in reverse (live -> _v2, _v1 -> live).
 ```
+
+## SMO-18 · Injection gate (2026-10-19; ADR-010)
+```bash
+# Console: enable Model Armor API; template sg-ingestion-pi (eu, PI + jailbreak only, low and above) kept for Phase 3/4
+uv run python infra/sql/apply.py infra/sql/004_quarantine.sql
+uv run python eval/injection_benchmark.py build && uv run python eval/injection_benchmark.py run regex gemini armor
+PYTHONPATH=ingestion uv run python ingestion/check_catalog.py            # after chunk_manuals, before embed/load
+PYTHONPATH=ingestion uv run python ingestion/check_catalog.py --apply    # record flags + remove them from the live catalog
+# Review (as Alexander): UPDATE catalog_quarantine SET status='approved', reviewed_at=now() WHERE parent_id='...';
+```

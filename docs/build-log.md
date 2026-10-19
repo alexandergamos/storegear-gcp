@@ -16,6 +16,7 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 | 10 | 2026-10-18 | SMO-15 | Deploy to Agent Runtime: six laptop-vs-cloud surprises |
 | 11 | 2026-10-18 | SMO-16 | Parser bake-off: Gemini vs Document AI |
 | 12 | 2026-10-18 | SMO-17 | New catalog: table-aware chunks, Q6 fixed, 43 % fewer tokens |
+| 13 | 2026-10-19 | SMO-18 | Injection gate: Gemini 40/40, Model Armor 9/40, catalog clean |
 
 ---
 
@@ -208,5 +209,21 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Por qué:** Q6 era un problema de datos; se arreglan los datos, no el prompt.
 - **Aprendido:** (1) **revisar el resultado antes de cargar.** Tres errores del troceado (agrupar de más, que borraba qué reloj tiene cada función; listas sin cortar; columnas de iconos) habrían empeorado la búsqueda en silencio; ninguno habría dado un error. (2) Tablas paralelas más un renombrado en una transacción hacen que una migración de datos se pueda deshacer con una sola sentencia. (3) Chunks más pequeños y precisos mejoraron la calidad *y* bajaron el coste. (4) La disponibilidad es ahora el eslabón más débil: un 504 tras 3 × 15 s, que se resolverá en la fase 4.
 - **Siguiente:** SMO-18, detección de prompt injection en la ingesta.
+
+---
+
+## 13 · Injection gate: Gemini 40/40, Model Armor 9/40, catalog clean (SMO-18) — 2026-10-19
+
+### EN
+- **What:** bake-off of 3 detectors on 240 real sections (140 clean, 60 hard negatives full of commands, 40 with a planted attack in 6 styles): regex 26/40, Gemini 3.8 Flash 40/40, Model Armor 9/40, all 0 false alarms. Gemini also resisted 4 attacks aimed at the classifier itself. JEV (TypeSafe) was considered but there was no API access. ADR-010 accepted: regex tripwire + Gemini classifier, quarantine table, fail closed. First run on the live catalog: 0 quarantined, 26 timeouts caught by fail closed, 1 regex false alarm fixed.
+- **Why:** SMO-20 turns the Drive folder into an input surface; poisoned documents are the RAG-specific attack.
+- **Learned:** (1) **Know what your guardrail is built for.** Model Armor misses most payloads even alone: it targets direct user jailbreaks, not indirect instructions in documents. (2) Two detectors that fail differently beat one great one: regex can't be argued with, the LLM understands paraphrase. (3) **Fail closed earns its keep immediately:** 0.8 % of checks timed out on the first run. (4) The first false alarm came from real vendor language, not from the test set: the test set is friendly, production isn't.
+- **Next:** SMO-19, queue + worker.
+
+### ES
+- **Qué:** comparativa de 3 detectores sobre 240 secciones reales (140 limpias, 60 trampa llenas de instrucciones de uso, 40 con un ataque plantado en 6 estilos): regex 26/40, Gemini 3.8 Flash 40/40, Model Armor 9/40, todos sin falsas alarmas. Gemini resistió además 4 ataques dirigidos al propio clasificador. Se consideró JEV (TypeSafe), sin acceso a la API. ADR-010 aceptado: regex como alarma fija + clasificador Gemini, tabla de cuarentena, fallo en cerrado. Primera pasada sobre el catálogo real: 0 en cuarentena, 26 timeouts frenados por el fallo en cerrado, 1 falsa alarma del regex corregida.
+- **Por qué:** con SMO-20 la carpeta de Drive pasa a ser una vía de entrada; los documentos envenenados son el ataque propio de un RAG.
+- **Aprendido:** (1) **Saber para qué está hecho tu guardrail.** Model Armor falla la mayoría de ataques incluso sueltos: está pensado para jailbreaks directos del usuario, no para instrucciones escondidas en documentos. (2) Dos detectores que fallan de forma distinta ganan a uno muy bueno: al regex no se le convence, el LLM entiende paráfrasis. (3) **El fallo en cerrado sirvió desde el primer día:** el 0,8 % de las comprobaciones hizo timeout. (4) La primera falsa alarma vino de lenguaje real del fabricante, no del set de prueba: el set de prueba es amable; producción, no.
+- **Siguiente:** SMO-19, cola + worker.
 
 ---

@@ -1,6 +1,6 @@
 # ADR-010 — Prompt-injection check at ingestion: Gemini classifier + regex tripwire, quarantine on doubt
 
-- **Status:** Proposed (2026-10-19)
+- **Status:** Accepted (2026-10-19)
 - **Date:** 2026-10-19
 - **Linear:** SMO-18
 - **Deciders:** Alexander (decides) · Claude (drafts and tests)
@@ -47,6 +47,13 @@ Quarantined sections go to a `catalog_quarantine` table (section text, file, det
 - **Good:** 40/40 on the test with zero false alarms; two independent detectors, so tricking one isn't enough; ≈ $1.50 per full re-ingest, cents per new manual; nothing suspicious is lost, it waits for review.
 - **Bad / accepted:** ~1.4 s per section (fine offline: 6 in parallel ≈ 15 min per full catalog); a second Gemini call path to monitor; the regex list needs upkeep.
 - **Model Armor** stays as the candidate for **runtime** screening of what staff type (Phase 3/4): that's its design target, and 141 ms fits the answer path. The `sg-ingestion-pi` template is kept for that test.
+
+## Addendum (2026-10-19): first run on the live catalog
+`ingestion/check_catalog.py` over all 3,338 sections: 22 min with 6 in parallel.
+- **Gemini flagged 0.** **26 calls (0.8 %) failed** with `499 CANCELLED` (EU endpoint tail latency against the 15 s timeout, the same issue as the SMO-17 eval). **Fail closed worked**: all 26 were treated as quarantined, and a re-run (errors are never cached) cleared them in 13 s.
+- **Regex flagged 1, a real false alarm:** "**Suunto recomienda siempre** comenzar la inmersión desde la pantalla previa…" is the vendor advising the diver. Fix: `responde siempre / recomienda siempre` now count only at a sentence start (or after `: | - > «`), the form an attack uses. Benchmark unchanged (26/40, 0/200); live catalog 0 hits.
+- **Result:** 0 sections quarantined. The live catalog was already clean, as expected for vendor PDFs. The gate matters from SMO-20 on, when anyone can drop a file into Drive.
+- **Cache design:** only the Gemini verdict is cached (by text hash); the regex re-runs every time because it's free and its patterns change.
 
 ## Revisit when
 - A real attack or a false alarm shows up in quarantine → add it to the test set and re-run.

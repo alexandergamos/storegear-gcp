@@ -31,7 +31,9 @@ PATTERNS = re.compile(
     r"developer\s+mode|modo\s+desarrollador|jailbreak|"
     r"(eres|you\s+are)\s+(ahora|now)\b|a\s+partir\s+de\s+ahora|from\s+now\s+on|"
     r"(asistente|assistant|modelo\s+de\s+(ia|lenguaje)|ai\s+(agent|model)|bot|llm)\s*[:,]|si\s+eres\s+un\s+modelo|if\s+you\s+are\s+an?\s+(ai|llm)|"
-    r"responde\s+(siempre|[uú]nicamente)|recomienda\s+siempre|always\s+(answer|recommend|say)|no\s+menciones|never\s+mention|"
+    # imperatives only at a sentence start: "Suunto recomienda siempre comenzar..." is the vendor advising the diver
+    r"(^|[.:;!¡>«\"|-]\s*)(responde\s+(siempre|[uú]nicamente)|recomienda\s+siempre)|no\s+menciones|"
+    r"always\s+(answer|recommend|say)|never\s+mention|"
     r"</?manual\b|override|desactiva\s+las\s+restricciones",
     re.I)
 

@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const UPDATED = '2026-10-17';
-const HEADLINE = 'Phase 2: new catalog live (SMO-17) · cloud eval 22/22 at 5 when answered · Q6 fixed · next SMO-18 injection check';
+const HEADLINE = 'Phase 2: injection gate live (SMO-18) · Gemini 40/40, Model Armor 9/40 · catalog clean · next SMO-19 queue + worker';
 
 // ---------------------------------------------------------------- content (edit statuses here)
 const LAPTOP = [
@@ -45,8 +45,8 @@ const GCP = [ // [title, items]
   ]],
   ['Ingestion pipeline', [
     ['done', 'Parser: Gemini + DocAI fallback'],
-    ['done', 'Table-aware chunks · 12,792'],
-    ['wip', 'Injection, queue, Drive (18-20)'],
+    ['done', 'Chunks + injection gate'],
+    ['wip', 'Queue + Drive sync (19-20)'],
   ]],
 ];
 const SOURCES = [
