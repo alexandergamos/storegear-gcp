@@ -27,10 +27,10 @@ def main(match: str, delete: bool) -> None:
     for name, fid in sorted(ids.items()):
         if match.lower() not in name.lower():
             continue
-        h = hashlib.md5((PDFS / name).read_bytes()).hexdigest()   # a delete carries the hash of the version it removes
         access = "manager" if "Interno" in name else "staff"
+        h = f"{hashlib.md5((PDFS / name).read_bytes()).hexdigest()}:{access}"   # same version key as the Drive sync
         cur.execute("INSERT INTO ingest_queue (file_id, file_name, access_level, action, content_hash) VALUES (%s, %s, %s, %s, %s) "
-                    "ON CONFLICT (file_id, content_hash, action) DO NOTHING RETURNING id",
+                    "ON CONFLICT (file_id, content_hash, action, target) DO NOTHING RETURNING id",
                     (fid, name, access, "delete" if delete else "upsert", h))
         row = cur.fetchone()
         print(f"{name}: " + (f"queued as job {row[0]}" if row else "already queued with this content (no-op)"))
