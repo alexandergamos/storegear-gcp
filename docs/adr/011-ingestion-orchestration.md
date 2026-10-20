@@ -48,9 +48,9 @@ Volume is tiny: 10 manuals today, a few new or changed ones a month. Each manual
 - **Bad / accepted:** retry/backoff logic is ours to test; the job polls (a scheduled run) instead of reacting instantly, fine for manuals that change monthly.
 
 ## Addendum (2026-10-20): built and tested locally
-- ,  (one manual end to end, replace in one transaction),  (reap → claim → run → done / retry / dead),  (manual enqueue),  +  whitelist (only code and the lock file are uploaded; manuals never leave the laptop).
-- **Tests on the live database:** enqueue twice → second is a no-op; the internal manual re-ingested end to end (6 sections, 10 chunks, manager level, 106 s); a missing file →  with retry in 2 min, then 4 min; a job on its last attempt →  +  at ERROR; a job stuck  for an hour → reaped and retried.
-- **Cloud Run job :** retries belong to the queue, not to Cloud Run. If Cloud Run also retried, a failed manual would be retried on two levels at once.
+- `infra/sql/005_ingest_queue.sql`, `ingestion/pipeline.py` (one manual end to end, replace in one transaction), `ingestion/worker.py` (reap → claim → run → done / retry / dead), `ingestion/enqueue.py` (manual enqueue), `Dockerfile` + `.gcloudignore` whitelist (only code and the lock file are uploaded; manuals never leave the laptop).
+- **Tests on the live database:** enqueue twice → second is a no-op; the internal manual re-ingested end to end (6 sections, 10 chunks, manager level, 106 s); a missing file → `queued` with retry in 2 min, then 4 min; a job on its last attempt → `dead` + `INGEST_DEAD` at ERROR; a job stuck `running` for an hour → reaped and retried.
+- **Cloud Run job `max-retries = 0`:** retries belong to the queue, not to Cloud Run. If Cloud Run also retried, a failed manual would be retried on two levels at once.
 
 ## Revisit when
 Volume reaches many files a day, ingestion must start within seconds of an upload, or more than one consumer needs the same events → Pub/Sub with a dead-letter topic.
