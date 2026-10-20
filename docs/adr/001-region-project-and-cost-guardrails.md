@@ -6,10 +6,10 @@
 - **Deciders:** Alexander (decides) · Claude (drafts)
 
 ## Context
-Every Google Cloud resource lives in a **project** (the container for resources, permissions, billing and quotas). A project has **no region of its own**: each resource (database, Cloud Run service, Vertex AI call) picks its location when it is created. So the region has to be a team rule, applied every time.
+Every Google Cloud resource lives in a **project** (the container for resources, permissions, billing and quotas). A project has **no region of its own**: each resource (database, Cloud Run service, Agent Platform call) picks its location when it is created. So the region has to be a team rule, applied every time.
 
 What matters here:
-- **Model availability:** new Gemini models and Vertex AI features don't reach every region at the same time.
+- **Model availability:** new Gemini models and Agent Platform features don't reach every region at the same time.
 - **Data residency:** staff chat history is personal data about employees, so GDPR applies. Product manuals are not personal data.
 - **Latency:** Barcelona users; but model time (~2 s per call) dwarfs network distance within Europe.
 - **Cost:** no free credits on this billing account (checked 2026-10-16), so every euro is real.
@@ -19,7 +19,7 @@ What matters here:
 ### Region
 | Option | Pros | Cons |
 |---|---|---|
-| **europe-west1 (Belgium)** | Widest Vertex AI / Gemini coverage in the EU; every service we need; data stays in the EU | ~30–40 ms from Barcelona |
+| **europe-west1 (Belgium)** | Widest Agent Platform / Gemini coverage in the EU; every service we need; data stays in the EU | ~30–40 ms from Barcelona |
 | europe-southwest1 (Madrid) | Lowest latency | Fewer AI services and later model availability |
 | us-central1 (Iowa) | Models and features land first | Employee data outside the EU (GDPR transfer issues) |
 
@@ -36,7 +36,7 @@ What matters here:
 | **Budget + enforced spend cap** | A hard stop: services pause at the cap | The agent goes down until the cap is lifted or the month resets |
 
 ## Decision
-- **Region `europe-west1`** for every resource (Cloud SQL, Cloud Run / Agent Engine, Vertex AI, Secret Manager replication, Artifact Registry).
+- **Region `europe-west1`** for every resource (Cloud SQL, Cloud Run / Agent Runtime, Agent Platform, Secret Manager replication, Artifact Registry).
 - **One project:** `storegear-prod-ag26` (project number 1066603052728). Billing linked.
 - **Budget €30 a month**, with alerts at 50 / 90 / 100 % actual and 100 % forecasted, plus an **enforced spend cap at €30**.
 - **Console first, code-reproducible:** Alexander configures through the Cloud Console to learn. Every step is recorded with its `gcloud` equivalent in `infra/runbook.md`. **Terraform later** (Linear SMO-30).

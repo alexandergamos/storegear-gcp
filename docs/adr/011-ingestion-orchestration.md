@@ -41,7 +41,7 @@ Volume is tiny: 10 manuals today, a few new or changed ones a month. Each manual
 ## Caveats
 - **Per-manual chunking vs cross-manual folding:** `chunk_manuals.py` folds brand sections into "Polar · información común" by comparing *all* manuals. Per job, a new manual's brand sections are checked against the existing common copy (same title + similar text → skip); they don't create a new one. A full rebuild (SMO-20) still runs the corpus-level fold.
 - **Cloud SQL trial ends ~16 Nov:** the queue lives with the catalog, so it follows whatever ADR-004's post-trial decision is.
-- **The job holds no secrets:** identity is `sg-ingestion` (Vertex AI, Document AI, Drive read, Cloud SQL IAM login). New roles: `roles/aiplatform.user`, `roles/documentai.apiUser`, `roles/run.invoker` for the scheduler, `roles/logging.logWriter`.
+- **The job holds no secrets:** identity is `sg-ingestion` (Agent Platform, Document AI, Drive read, Cloud SQL IAM login). New roles: `roles/aiplatform.user`, `roles/documentai.apiUser`, `roles/run.invoker` for the scheduler, `roles/logging.logWriter`.
 
 ## Consequences
 - **Good:** one new runtime piece; queue state visible with SQL; same design as n8n, so the final comparison (SMO-29) is like for like; retries, dead letter and alert covered.

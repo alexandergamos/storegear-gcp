@@ -208,7 +208,7 @@ STOREGEAR_LOCAL_PDFS=1 uv run python ingestion/worker.py          # local test: 
 # Console (done by Alexander):
 #  APIs: Cloud Run Admin, Artifact Registry, Cloud Build, Google Drive
 #  Artifact Registry: Docker repo "storegear", multi-region europe (EU)
-#  IAM for sg-ingestion: Vertex AI User, Document AI API User, Logs Writer; Token Creator on itself (Drive scope)
+#  IAM for sg-ingestion: Agent Platform User (roles/aiplatform.user), Document AI API User, Logs Writer; Token Creator on itself (Drive scope)
 #  Drive: share the manuals folder with sg-ingestion@storegear-prod-ag26.iam.gserviceaccount.com (Viewer)
 gcloud meta list-files-for-upload                                  # check: only code + lock file
 gcloud builds submit --tag europe-docker.pkg.dev/storegear-prod-ag26/storegear/ingest-worker:v1

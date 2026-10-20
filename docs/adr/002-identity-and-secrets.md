@@ -6,7 +6,7 @@
 - **Deciders:** Alexander (decides) · Claude (drafts)
 
 ## Context
-Every running piece of the system (the agent, the ingestion job, later the CI pipeline) has to prove **who it is** to other Google services (Vertex AI, Cloud SQL, Drive, Sheets). It also needs a few **secrets** that aren't Google identities.
+Every running piece of the system (the agent, the ingestion job, later the CI pipeline) has to prove **who it is** to other Google services (Agent Platform, Cloud SQL, Drive, Sheets). It also needs a few **secrets** that aren't Google identities.
 
 Key concepts:
 - **IAM:** *who* (a principal) can do *what* (a role, which bundles permissions) on *which resource*.
@@ -44,8 +44,8 @@ In n8n, all of this was hidden in the credential manager: one credential per ser
 
 | SA | Used by | Roles (project level unless noted) |
 |---|---|---|
-| `sg-agent` | the ADK agent runtime | Vertex AI User · Cloud SQL Client · Cloud SQL Instance User · Logs Writer · Monitoring Metric Writer · Cloud Trace Agent · Secret Accessor **on specific secrets only** |
-| `sg-ingestion` | the ingestion job | Vertex AI User · Cloud SQL Client · Cloud SQL Instance User · Logs Writer · (Document AI API User in Phase 2) |
+| `sg-agent` | the ADK agent runtime | Agent Platform User (`roles/aiplatform.user`) · Cloud SQL Client · Cloud SQL Instance User · Logs Writer · Monitoring Metric Writer · Cloud Trace Agent · Secret Accessor **on specific secrets only** |
+| `sg-ingestion` | the ingestion job | Agent Platform User (`roles/aiplatform.user`) · Cloud SQL Client · Cloud SQL Instance User · Logs Writer · (Document AI API User in Phase 2) |
 
 - **Drive and Sheets:** not IAM roles. The SA email is **shared on the Drive folder or Sheet** like a colleague would be: Viewer only. Access is limited to exactly those files.
 - **No JSON keys, ever.** Locally: `gcloud auth application-default login`. To test with exactly the SA's permissions: **impersonation**, which needs `Service Account Token Creator` for Alexander on each SA.

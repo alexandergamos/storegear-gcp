@@ -45,7 +45,7 @@ The challenge: rebuild the same product using **only Google Cloud** services, by
 ## Consequences
 - **Good:** hands-on experience across the full AI production lifecycle, and a direct n8n vs code-first comparison for the thesis annex.
 - **Bad / accepted trade-offs:** scripted gcloud instead of Terraform; a single project rather than separate dev and prod; some n8n features may be simplified to fit the time.
-- **Caveats:** Cloud SQL is always on, so it costs money even when idle. Vertex AI quotas and model availability depend on the region. Re-embedding means retrieval may differ from n8n until it's tuned.
+- **Caveats:** Cloud SQL is always on, so it costs money even when idle. Agent Platform quotas and model availability depend on the region. Re-embedding means retrieval may differ from n8n until it's tuned.
 
 ## Revisit when
 Phase 1 slips past 21 Oct. In that case, drop Phase 4 to its essentials (alerts + dead-letter queue) and protect the comparison on 31 Oct.

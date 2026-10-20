@@ -1,6 +1,6 @@
 # StoreGear on Google Cloud — context for Claude Code
 
-The StoreGear Assistant (master's MVP, Alexander, Barcelona) is being rebuilt **entirely on Google Cloud** with ADK + Vertex AI. The original agent runs on n8n Cloud; that build is the official deliverable. This repo is the extra challenge, due **31 Oct 2026**.
+The StoreGear Assistant (master's MVP, Alexander, Barcelona) is being rebuilt **entirely on Google Cloud** with ADK + Gemini Enterprise Agent Platform. The original agent runs on n8n Cloud; that build is the official deliverable. This repo is the extra challenge, due **31 Oct 2026**.
 
 **Main goal: learning.** Alexander wants to understand, like an AI engineer shipping a product to production, what each component is, why it was chosen, the alternatives, pros and cons, caveats and cost. Shipping without understanding counts as failure.
 
