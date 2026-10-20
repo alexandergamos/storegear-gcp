@@ -58,6 +58,18 @@ In n8n, all of this was hidden in the credential manager: one credential per ser
 - **Bad / accepted:** more grants to manage. Local runs use Alexander's broad permissions unless impersonating, so "works on my machine" can hide a missing role. Always do a final test with impersonation.
 - **Caveats:** IAM changes can take a minute or two to propagate. "Cloud SQL Instance User" is the role for IAM DB login, and "Cloud SQL Client" is the role to connect; both are needed. Sharing a Drive folder with an SA works only for the files inside it.
 
+## Addendum (2026-10-20, SMO-19): Token Creator at the narrowest level
+The "self-impersonation" that lets a service account ask for an extra OAuth scope (Sheets for `sg-agent`, Drive for `sg-ingestion`) needs `roles/iam.serviceAccountTokenCreator`. That role can be granted at two levels, with very different effects:
+
+| Granted on | Means |
+|---|---|
+| **the project** | the account can mint tokens for **any** service account in the project, including the default Compute account (Editor) |
+| **the service account itself** | the account can only mint tokens **for itself** |
+
+Both accounts had it at project level since 18 Oct (the Sheets fix); found while reviewing the SMO-19 setup, together with the new Cloud Run job running as the default Compute account (Editor) because the Security tab was left at its default. Fixed: the job runs as `sg-ingestion`; each account has Token Creator **only on itself**; the project-level grant is gone. Verified with eval Q18 (price via Sheets) 5/5/5/5 after the change.
+
+**Rule:** always grant a role at the narrowest resource that works, and after any IAM change in the Console, check the result (`gcloud projects get-iam-policy` / `gcloud iam service-accounts get-iam-policy`): two screens that look alike can grant at different levels.
+
 ## Revisit when
 - CI arrives (SMO-28): add `sg-deploy` with Workload Identity Federation.
 - Multiple environments arrive: one set of SAs per project.

@@ -216,3 +216,7 @@ gcloud builds submit --tag europe-docker.pkg.dev/storegear-prod-ag26/storegear/i
 #  task timeout 3600 s, max retries 0 (the queue retries), 1 task
 #  Logging > Logs Explorer: jsonPayload.message="INGEST_DEAD" > Create alert > email channel
 ```
+# Lessons (2026-10-20): enable the Google Drive API in the project (first cloud run got 403 "API not used in project");
+# grant Token Creator ON the service account itself, never at project level; then verify:
+#   gcloud projects get-iam-policy storegear-prod-ag26 --flatten="bindings[].members" --filter="bindings.role:serviceAccountTokenCreator"
+#   gcloud iam service-accounts add-iam-policy-binding <sa> --member=serviceAccount:<sa> --role=roles/iam.serviceAccountTokenCreator

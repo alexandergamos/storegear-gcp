@@ -17,6 +17,7 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 | 11 | 2026-10-18 | SMO-16 | Parser bake-off: Gemini vs Document AI |
 | 12 | 2026-10-18 | SMO-17 | New catalog: table-aware chunks, Q6 fixed, 43 % fewer tokens |
 | 13 | 2026-10-19 | SMO-18 | Injection gate: Gemini 40/40, Model Armor 9/40, catalog clean |
+| 14 | 2026-10-20 | SMO-19 | Ingestion queue on Cloud Run: retries, dead letter, alert |
 
 ---
 
@@ -225,5 +226,21 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Por qué:** con SMO-20 la carpeta de Drive pasa a ser una vía de entrada; los documentos envenenados son el ataque propio de un RAG.
 - **Aprendido:** (1) **Saber para qué está hecho tu guardrail.** Model Armor falla la mayoría de ataques incluso sueltos: está pensado para jailbreaks directos del usuario, no para instrucciones escondidas en documentos. (2) Dos detectores que fallan de forma distinta ganan a uno muy bueno: al regex no se le convence, el LLM entiende paráfrasis. (3) **El fallo en cerrado sirvió desde el primer día:** el 0,8 % de las comprobaciones hizo timeout. (4) La primera falsa alarma vino de lenguaje real del fabricante, no del set de prueba: el set de prueba es amable; producción, no.
 - **Siguiente:** SMO-19, cola + worker.
+
+---
+
+## 14 · Ingestion queue on Cloud Run: retries, dead letter, alert (SMO-19) — 2026-10-20
+
+### EN
+- **What:** ADR-011 accepted: a Postgres queue table drained by a Cloud Run job (`sg-ingest-worker`, runs as `sg-ingestion`). Per job: Drive download → parse → chunk → injection gate → embed → replace the manual in one transaction. `UNIQUE (file_id, content_hash, action)` makes enqueues idempotent; `FOR UPDATE SKIP LOCKED` claims; exponential backoff; 3 attempts → `dead` + `INGEST_DEAD` log line → log-based email alert; stale claims reaped. Tested locally (happy path, retry, dead, stale) and in the cloud: first run 403 (Drive API off) → retried → done, 10 chunks in 20 s.
+- **Why:** Phase 2 needs ingestion to run unattended and be safe to retry; the table is the state machine, so a managed queue would only add pieces at 10 manuals a month.
+- **Learned:** (1) **Retries belong to one layer.** Cloud Run job `max-retries = 0`, because the queue already retries. (2) **Check what the Console actually did.** The job ran as the default Compute account (Editor) and Token Creator sat at project level for both service accounts; `get-iam-policy` caught both. Same role, two levels, very different blast radius. (3) **`.gcloudignore` decides what reaches Cloud Build, not `.dockerignore`.** A whitelist keeps the manuals on the laptop. (4) The failure path proved itself on day one: the Drive 403 was logged, retried and recovered without anyone touching the database.
+- **Next:** SMO-20, Drive sync on a schedule.
+
+### ES
+- **Qué:** ADR-011 aceptado: una tabla de cola en Postgres que vacía un job de Cloud Run (`sg-ingest-worker`, se ejecuta como `sg-ingestion`). Por cada trabajo: descarga de Drive → lectura → troceado → filtro de injection → embeddings → sustituir el manual en una transacción. `UNIQUE (file_id, content_hash, action)` hace que encolar sea idempotente; `FOR UPDATE SKIP LOCKED` reparte el trabajo; reintentos con espera exponencial; 3 intentos → `dead` + línea `INGEST_DEAD` → alerta por email; los trabajos colgados se recuperan. Probado en local (camino feliz, reintento, muerto, colgado) y en la nube: primera ejecución 403 (API de Drive apagada) → reintento → hecho, 10 chunks en 20 s.
+- **Por qué:** la fase 2 necesita que la ingesta funcione sola y se pueda repetir sin riesgo; la tabla ya es la máquina de estados, así que una cola gestionada solo añadiría piezas para 10 manuales al mes.
+- **Aprendido:** (1) **Los reintentos, en una sola capa.** El job de Cloud Run va con `max-retries = 0` porque la cola ya reintenta. (2) **Comprobar lo que la consola hizo de verdad.** El job se ejecutaba con la cuenta por defecto de Compute (Editor) y Token Creator estaba a nivel de proyecto para las dos cuentas de servicio; `get-iam-policy` destapó las dos cosas. El mismo rol en dos niveles tiene un alcance muy distinto. (3) **Lo que se sube a Cloud Build lo decide `.gcloudignore`, no `.dockerignore`.** Una lista blanca mantiene los manuales en el portátil. (4) El camino de fallo se probó solo el primer día: el 403 de Drive se registró, se reintentó y se recuperó sin tocar la base de datos.
+- **Siguiente:** SMO-20, sincronización con Drive programada.
 
 ---

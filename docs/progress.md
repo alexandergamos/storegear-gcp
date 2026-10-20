@@ -1,6 +1,6 @@
 # Progress summary
 
-*Updated 2026-10-19 (after SMO-18). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
+*Updated 2026-10-20 (after SMO-19). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
 
 ## In one paragraph
 We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and its tables, Spanish search and permissions are live. The catalog is loaded: 9,054 passages from 10 manuals, each with a Google embedding.
@@ -92,10 +92,16 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 - **The gate:** every section goes through regex **and** Gemini before loading; if either fires, or the check fails, it goes to a quarantine table for Alex to review. Nothing suspicious is deleted, and nothing unchecked gets in.
 - **First real run:** 3,338 sections, 0 quarantined. One regex false alarm ("Suunto recomienda siempre…") led to a tighter rule. ≈ $1.50 per full check.
 
+### 14. The ingestion queue (SMO-19)
+- **What:** ingestion no longer runs by hand on the laptop. Each manual is a row in a queue table in the database; a **Cloud Run job** takes one, downloads it from Drive, and runs the whole chain (read, chunk, injection check, embed) before swapping the old version for the new one in one step.
+- **Safe to repeat:** adding the same file twice does nothing. If a step fails, the job retries after 2 minutes, then 4; after 3 failures it's marked **dead** and you get an **email**. A worker that crashes mid-way doesn't leave the manual stuck: the next run picks it up.
+- **First cloud run:** it failed once (the Drive API wasn't switched on), retried as designed, and succeeded: 10 chunks in 20 seconds.
+- **Security catch:** the job had started as Google's default account (Editor on everything), and the "impersonate itself" permission had been granted for the whole project instead of for each account. Both fixed and verified.
+
 ## What's next
 | Next | Issue | What happens |
 |---|---|---|
-| 1 | SMO-19 / 20 | Queue + worker on Google Cloud, Drive sync: new manuals flow in automatically |
+| 1 | SMO-20 | Drive sync on a schedule: new, changed and deleted manuals reach the catalog on their own; full rebuild + eval |
 
 ## Numbers to beat (n8n, 2026-10-11)
 Correctness 5.00 · Faithfulness 4.95 · Context 5.00 · Answer 5.00 · median 9.0 s · ~$0.008 per answer.
