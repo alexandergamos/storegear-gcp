@@ -207,11 +207,11 @@ uv run python ingestion/enqueue.py "Interno"                      # local test: 
 STOREGEAR_LOCAL_PDFS=1 uv run python ingestion/worker.py          # local test: drain the queue
 # Console (done by Alexander):
 #  APIs: Cloud Run Admin, Artifact Registry, Cloud Build, Google Drive
-#  Artifact Registry: Docker repo "storegear", europe-west1
+#  Artifact Registry: Docker repo "storegear", multi-region europe (EU)
 #  IAM for sg-ingestion: Vertex AI User, Document AI API User, Logs Writer; Token Creator on itself (Drive scope)
 #  Drive: share the manuals folder with sg-ingestion@storegear-prod-ag26.iam.gserviceaccount.com (Viewer)
 gcloud meta list-files-for-upload                                  # check: only code + lock file
-gcloud builds submit --tag europe-west1-docker.pkg.dev/storegear-prod-ag26/storegear/ingest-worker:v1
+gcloud builds submit --tag europe-docker.pkg.dev/storegear-prod-ag26/storegear/ingest-worker:v1
 #  Cloud Run > Jobs > Create: sg-ingest-worker, europe-west1, that image, SA sg-ingestion, 2 CPU / 2 GiB,
 #  task timeout 3600 s, max retries 0 (the queue retries), 1 task
 #  Logging > Logs Explorer: jsonPayload.message="INGEST_DEAD" > Create alert > email channel
