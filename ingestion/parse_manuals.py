@@ -84,20 +84,26 @@ def parse_batch(job: dict) -> dict:
     return {"pages": [p + 1 for p in pages], "parser": used, "coverage": round(cov, 3), "seconds": round(time.time() - t0, 1), "md": md}
 
 
-def parse_manual(pdf: Path) -> None:
-    reader = PdfReader(str(pdf))
+def parse_pdf_bytes(data: bytes) -> tuple[str, list[dict]]:
+    """PDF bytes -> (Markdown with page markers, per-batch report). Used by this script and the queue worker."""
+    reader = PdfReader(io.BytesIO(data))
     batches = [list(range(i, min(i + BATCH, len(reader.pages)))) for i in range(0, len(reader.pages), BATCH)]
     jobs = [{"pages": b, "data": batch_pdf(reader, b), "raw": "\n".join(reader.pages[p].extract_text() or "" for p in b)}
             for b in batches]  # cut every batch in this thread first
     with ThreadPoolExecutor(max_workers=6) as pool:
         results = list(pool.map(parse_batch, jobs))
     md = "\n\n".join(f"<!-- page {r['pages'][0]} -->\n{r['md']}" for r in results)
+    return md, [{k: v for k, v in r.items() if k != "md"} for r in results]
+
+
+def parse_manual(pdf: Path) -> None:
+    md, report = parse_pdf_bytes(pdf.read_bytes())
     (OUT / f"{pdf.stem}.md").write_text(md, encoding="utf-8")
-    report = [{k: v for k, v in r.items() if k != "md"} for r in results]
     (OUT / f"{pdf.stem}.report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
-    covs = [r["coverage"] for r in results]
-    fallback = sum(r["parser"] == "docai" for r in results)
-    print(f"{pdf.stem:40} {len(reader.pages):4} pages · coverage min {min(covs):.2f} avg {sum(covs) / len(covs):.2f} · docai fallback {fallback}/{len(results)}")
+    covs = [r["coverage"] for r in report]
+    fallback = sum(r["parser"] == "docai" for r in report)
+    pages = sum(len(r["pages"]) for r in report)
+    print(f"{pdf.stem:40} {pages:4} pages · coverage min {min(covs):.2f} avg {sum(covs) / len(covs):.2f} · docai fallback {fallback}/{len(report)}")
 
 
 if __name__ == "__main__":

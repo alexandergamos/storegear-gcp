@@ -1,0 +1,7 @@
+# Only pyproject.toml, uv.lock and ingestion/ belong in the image. Manuals (incl. the internal one), embeddings,
+# eval results and local credentials must never be uploaded to Cloud Build or baked into the image.
+*
+!pyproject.toml
+!uv.lock
+!ingestion/
+ingestion/__pycache__/

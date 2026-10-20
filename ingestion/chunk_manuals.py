@@ -144,6 +144,33 @@ def jaccard(a: set, b: set) -> float:
     return len(a & b) / max(len(a | b), 1)
 
 
+def norm_title(title: str) -> str:
+    return re.sub(r"\W+", " ", title.lower()).strip()
+
+
+def build_manual(md: str, file_name: str, file_id: str, access: str, common: dict[str, str]) -> tuple[list[dict], list[dict], list[str]]:
+    """ONE manual -> (parents, chunks, folded titles), for the queue worker (SMO-19, ADR-011).
+    `common` maps normalised title -> text of the existing "Polar · información común" copies. A brand section is
+    folded (skipped) when a common copy with the same title and >= DUP_SIM similar text already exists; a per-manual
+    run never creates a new common copy (that needs >= 3 manuals, so it stays a full-rebuild job: main())."""
+    parents, chunks, folded = [], [], []
+    for s in sections(md, file_name):
+        if SKIP_TITLES.search(s["title"]):
+            continue
+        body = "\n".join(s["lines"]).strip()
+        key = norm_title(s["title"])
+        if COMMON_TITLES.search(key) and key in common and jaccard(shingles(body), shingles(common[key])) >= DUP_SIM:
+            folded.append(s["title"])
+            continue
+        for part in [body[i:i + PARENT_MAX] for i in range(0, len(body), PARENT_MAX)] or [body]:
+            pid = f"{file_id}::p{len(parents)}"
+            parents.append({"parent_id": pid, "file_id": file_id, "header_path": s["path"], "parent_context": part})
+            chunks += [{"child_id": f"{pid}::c{j}", "parent_id": pid, "file_id": file_id, "file_name": file_name,
+                        "header_path": s["path"], "chunk_text": ch, "product_category": "smartwatch", "access_level": access}
+                       for j, ch in enumerate(chunks_of(part.splitlines()))]
+    return parents, chunks, folded
+
+
 def main() -> None:
     ids = file_ids()
     secs = []

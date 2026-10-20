@@ -1358,12 +1358,8 @@ dependencies = [
     { name = "google-cloud-documentai" },
     { name = "google-cloud-secret-manager" },
     { name = "numpy" },
-    { name = "sqlalchemy" },
-]
-
-[package.dev-dependencies]
-dev = [
     { name = "pypdf" },
+    { name = "sqlalchemy" },
 ]
 
 [package.metadata]
@@ -1374,11 +1370,12 @@ requires-dist = [
     { name = "google-cloud-documentai", specifier = ">=3.16.0" },
     { name = "google-cloud-secret-manager", specifier = ">=2.31.0" },
     { name = "numpy", specifier = ">=2.5.4" },
+    { name = "pypdf", specifier = ">=6.21.1" },
     { name = "sqlalchemy", specifier = ">=2.1.5" },
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pypdf", specifier = ">=6.21.1" }]
+dev = []
 
 [[package]]
 name = "tenacity"

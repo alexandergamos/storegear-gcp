@@ -8,6 +8,7 @@ catalog (ADR-002). Idempotent: upserts on child_id / parent_id, so it can be re-
 import atexit
 import csv
 import json
+import os
 import sys
 import time
 
@@ -52,11 +53,14 @@ _connector: Connector | None = None
 
 
 def connect():
-    """A pg8000 connection AS sg-ingestion (the connector stays open until the process exits)."""
+    """A pg8000 connection AS sg-ingestion (the connector stays open until the process exits).
+    On a laptop we impersonate sg-ingestion; inside the Cloud Run job we already ARE sg-ingestion
+    (STOREGEAR_RUNNING_AS_SA=1), so the default credentials are used directly."""
     global _connector
     if _connector is None:
         base, _ = google.auth.default(scopes=SCOPES)
-        creds = impersonated_credentials.Credentials(source_credentials=base, target_principal=SA, target_scopes=SCOPES)
+        creds = base if os.getenv("STOREGEAR_RUNNING_AS_SA") == "1" else \
+            impersonated_credentials.Credentials(source_credentials=base, target_principal=SA, target_scopes=SCOPES)
         _connector = Connector(credentials=creds)
         atexit.register(_connector.close)
     return _connector.connect(INSTANCE, "pg8000", user=f"sg-ingestion@{PROJECT}.iam", db="storegear", enable_iam_auth=True)

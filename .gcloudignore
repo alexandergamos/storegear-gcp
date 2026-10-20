@@ -1,0 +1,9 @@
+# What `gcloud builds submit` uploads to Cloud Build (it ignores .dockerignore for the upload itself).
+# Whitelist: manuals, embeddings, eval data and local credentials never leave the laptop.
+*
+!Dockerfile
+!.dockerignore
+!pyproject.toml
+!uv.lock
+!ingestion/
+ingestion/__pycache__/
