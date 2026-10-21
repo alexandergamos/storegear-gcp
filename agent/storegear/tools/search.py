@@ -40,7 +40,7 @@ TOP_K = 8                  # n8n topK
 FETCH_K = TOP_K * 3        # candidates per branch (dense / keyword)
 # Which catalog tables to read: "" = live, "_v2" = the re-parsed side tables under evaluation (SMO-17).
 CATALOG_SUFFIX = os.getenv("STOREGEAR_CATALOG_SUFFIX", "")
-RETURN_N = 5               # parents handed to the model
+RETURN_N = int(os.getenv("STOREGEAR_RETURN_N", "5"))   # parents handed to the model
 MAX_PER_MANUAL = 3         # diversity: a comparison ("A vs B") must not get 5 sections of A
 SCOPES = ["https://www.googleapis.com/auth/sqlservice.login", "https://www.googleapis.com/auth/cloud-platform"]
 

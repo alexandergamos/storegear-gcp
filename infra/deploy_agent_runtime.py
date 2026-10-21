@@ -36,6 +36,7 @@ ENV = {
     "STOREGEAR_THINKING": "low",
     "STOREGEAR_MODEL_TIMEOUT_MS": "15000",
     "STOREGEAR_EMBED_LOCATION": "eu",
+    "STOREGEAR_RETURN_N": "7",   # sections handed to the model; 5 -> 7 on 2026-10-21 (Q10 ranks 7th), see SMO-33 reranker
     "STOREGEAR_SHEETS_SA": SA,  # self-impersonation for a spreadsheets-scoped token (metadata tokens lack it)
     "STOREGEAR_PROJECT_ID": PROJECT,  # the runtime's GOOGLE_CLOUD_PROJECT is the project number
     "STOREGEAR_DB_USER": f"sg-agent@{PROJECT}.iam",  # runtime credentials don't expose the SA email until refreshed
