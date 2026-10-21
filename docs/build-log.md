@@ -18,6 +18,9 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 | 12 | 2026-10-18 | SMO-17 | New catalog: table-aware chunks, Q6 fixed, 43 % fewer tokens |
 | 13 | 2026-10-19 | SMO-18 | Injection gate: Gemini 40/40, Model Armor 9/40, catalog clean |
 | 14 | 2026-10-20 | SMO-19 | Ingestion queue on Cloud Run: retries, dead letter, alert |
+| 15 | 2026-10-21 | SMO-20 | Drive sync + catalog rebuilt by the cloud pipeline |
+| 16 | 2026-10-21 | SMO-21 | Threat model: OWASP LLM + Agentic, trifecta kept broken |
+| 17 | 2026-10-21 | SMO-22 | Login and roles: Identity Platform + sg-api, 7/7 |
 
 ---
 
@@ -242,5 +245,53 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Por qué:** la fase 2 necesita que la ingesta funcione sola y se pueda repetir sin riesgo; la tabla ya es la máquina de estados, así que una cola gestionada solo añadiría piezas para 10 manuales al mes.
 - **Aprendido:** (1) **Los reintentos, en una sola capa.** El job de Cloud Run va con `max-retries = 0` porque la cola ya reintenta. (2) **Comprobar lo que la consola hizo de verdad.** El job se ejecutaba con la cuenta por defecto de Compute (Editor) y Token Creator estaba a nivel de proyecto para las dos cuentas de servicio; `get-iam-policy` destapó las dos cosas. El mismo rol en dos niveles tiene un alcance muy distinto. (3) **Lo que se sube a Cloud Build lo decide `.gcloudignore`, no `.dockerignore`.** Una lista blanca mantiene los manuales en el portátil. (4) El camino de fallo se probó solo el primer día: el 403 de Drive se registró, se reintentó y se recuperó sin tocar la base de datos.
 - **Siguiente:** SMO-20, sincronización con Drive programada.
+
+---
+
+## 15 · Drive sync + catalog rebuilt by the cloud pipeline (SMO-20) — 2026-10-21
+
+### EN
+- **What:** ADR-012: a reconciliation loop (`ingestion/sync.py`, run by the job with `--sync`) compares Drive (desired) with the queue and catalog (actual) and enqueues upserts, moves (version key `md5:access`) and deletes; an empty listing never deletes. Full rebuild into `_v3` by 3 parallel tasks in 31 min; `fold_common` rebuilt the 13 shared Polar sections; eval 4.95/5/5/5; swapped live with the queue history. Cloud Scheduler trigger configured but not dispatching (Google-side).
+- **Why:** Drive is the source of truth; the catalog must follow it without anyone running scripts.
+- **Learned:** (1) **Reconciliation beats events** at this scale: it can't miss a change, and a failed run is fixed by the next one. (2) **Parallel workers for free:** `SKIP LOCKED` meant three Cloud Run tasks shared the queue with zero coordination code, and a 504 on one manual was absorbed by another worker. (3) **Move the bookkeeping with the data:** the swap also re-targets the queue rows, or the live sync would have re-ingested everything.
+- **Next:** confirm the scheduler; SMO-21.
+
+### ES
+- **Qué:** ADR-012: un bucle de reconciliación (`ingestion/sync.py`, lo ejecuta el job con `--sync`) compara Drive (estado deseado) con la cola y el catálogo (estado real) y encola altas, cambios, movimientos (clave de versión `md5:acceso`) y bajas; un listado vacío nunca borra. Reconstrucción completa en `_v3` con 3 tareas en paralelo en 31 min; `fold_common` recreó las 13 secciones comunes de Polar; eval 4,95/5/5/5; activado junto con el historial de la cola. El disparador de Cloud Scheduler está configurado pero no se ejecuta (problema de Google).
+- **Por qué:** Drive es la fuente de verdad; el catálogo tiene que seguirla sin que nadie lance scripts.
+- **Aprendido:** (1) **La reconciliación gana a los eventos** a esta escala: no puede perder un cambio, y una ejecución fallida la arregla la siguiente. (2) **Workers en paralelo gratis:** con `SKIP LOCKED`, tres tareas de Cloud Run se repartieron la cola sin código de coordinación, y un 504 en un manual lo absorbió otro worker. (3) **Mover la contabilidad con los datos:** el cambio de tablas también reasigna las filas de la cola; si no, la sincronización habría vuelto a procesarlo todo.
+- **Siguiente:** confirmar el scheduler; SMO-21.
+
+---
+
+## 16 · Threat model: OWASP LLM + Agentic, trifecta kept broken (SMO-21) — 2026-10-21
+
+### EN
+- **What:** `docs/threat-model.md`: assets, actors, entry points; the lethal trifecta check; every item of the OWASP Top 10 for LLM Applications 2025 and the OWASP Top 10 for Agentic Applications (Dec 2025) mapped to a control or an accepted-risk note. ADR-013 accepted: five-layer defence in depth, access control never in the prompt, HITL rule for any action tool.
+- **Why:** know what we defend before building defences; it set the order of SMO-22 and SMO-23.
+- **Learned:** (1) **The biggest gap was not exotic:** the caller set the role. (2) **The trifecta is broken by design** (no outbound tools), and the residual channel is the answer itself (links, phone numbers), which goes into SMO-23 as an output rule. (3) Check the source: a "2026 edition" of the OWASP LLM list appears in third-party posts, but the official pages still publish 2025.
+- **Next:** SMO-22.
+
+### ES
+- **Qué:** `docs/threat-model.md`: activos, actores, puntos de entrada; la comprobación de la "lethal trifecta"; cada riesgo del OWASP Top 10 para aplicaciones LLM 2025 y del OWASP Top 10 para aplicaciones agénticas (dic. 2025) asociado a un control o a un riesgo aceptado con su motivo. ADR-013 aceptado: defensa en profundidad en cinco capas, el control de acceso nunca en el prompt, aprobación humana para cualquier herramienta que actúe.
+- **Por qué:** saber de qué nos defendemos antes de construir defensas; ordenó SMO-22 y SMO-23.
+- **Aprendido:** (1) **El mayor hueco no era exótico:** quien llamaba elegía el rol. (2) **La trifecta está rota por diseño** (ninguna herramienta envía datos fuera), y el canal residual es la propia respuesta (enlaces, teléfonos), que pasa a SMO-23 como regla de salida. (3) Comprobar la fuente: una "edición 2026" de la lista OWASP aparece en artículos de terceros, pero las páginas oficiales siguen publicando la de 2025.
+- **Siguiente:** SMO-22.
+
+---
+
+## 17 · Login and roles: Identity Platform + sg-api, 7/7 (SMO-22) — 2026-10-21
+
+### EN
+- **What:** ADR-014 accepted. Identity Platform (email/password only, sign-up disabled, API key restricted to the two auth APIs). `sg-api` on Cloud Run verifies the ID token, takes the role from a custom claim set only by `infra/users.py`, rate-limits per user in Cloud SQL, and calls Agent Runtime as `sg-api`. `eval/auth_tests.py` 7/7 on the deployed service: 401, 401, 403, staff without internal figures, manager with them, role in the body ignored, 429.
+- **Why:** the threat model's top gap: the caller chose the role.
+- **Learned:** (1) **IAP was out** for a reason worth knowing: its direct Cloud Run mode needs an organization, and a personal project has none. (2) **"Public" Cloud Run + app-level auth** is the right pattern when users aren't Google Cloud principals; the 401 comes before any work. (3) **Defaults are broad again:** Firebase's auto-created key was open to ~25 APIs, including Cloud SQL Admin. (4) Two small traps: Cloud Run reserves paths ending in "z" (`/healthz`), and the Cloud SQL connector needs the `cloud-platform` scope.
+- **Next:** SMO-23 guardrails.
+
+### ES
+- **Qué:** ADR-014 aceptado. Identity Platform (solo email y contraseña, registro desactivado, clave de API limitada a las dos APIs de autenticación). `sg-api` en Cloud Run verifica el token, toma el rol de un claim que solo asigna `infra/users.py`, limita peticiones por usuario en Cloud SQL y llama a Agent Runtime como `sg-api`. `eval/auth_tests.py` 7/7 sobre el servicio desplegado: 401, 401, 403, staff sin cifras internas, encargado con ellas, rol en el cuerpo ignorado, 429.
+- **Por qué:** el hueco principal del modelo de amenazas: quien llamaba elegía el rol.
+- **Aprendido:** (1) **IAP quedó fuera** por un motivo que conviene saber: su modo directo en Cloud Run exige una organización, y un proyecto personal no la tiene. (2) **Cloud Run "público" + autenticación en la app** es el patrón correcto cuando los usuarios no son identidades de Google Cloud; el 401 llega antes de cualquier trabajo. (3) **Los valores por defecto vuelven a ser amplios:** la clave que creó Firebase estaba abierta a ~25 APIs, incluida Cloud SQL Admin. (4) Dos trampas pequeñas: Cloud Run reserva las rutas que acaban en "z" (`/healthz`), y el conector de Cloud SQL necesita el scope `cloud-platform`.
+- **Siguiente:** SMO-23, guardrails.
 
 ---

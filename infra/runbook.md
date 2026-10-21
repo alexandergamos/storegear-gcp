@@ -220,3 +220,30 @@ gcloud builds submit --tag europe-docker.pkg.dev/storegear-prod-ag26/storegear/i
 # grant Token Creator ON the service account itself, never at project level; then verify:
 #   gcloud projects get-iam-policy storegear-prod-ag26 --flatten="bindings[].members" --filter="bindings.role:serviceAccountTokenCreator"
 #   gcloud iam service-accounts add-iam-policy-binding <sa> --member=serviceAccount:<sa> --role=roles/iam.serviceAccountTokenCreator
+
+## SMO-20 · Drive sync + rebuild (2026-10-21; ADR-012)
+```bash
+uv run python infra/sql/apply.py infra/sql/006_sync_and_v3.sql
+gcloud builds submit --tag europe-docker.pkg.dev/storegear-prod-ag26/storegear/ingest-worker:v2
+#  Console: job image -> v2; Execute with overrides: 3 tasks, env STOREGEAR_CATALOG_SUFFIX=_v3 (rows enqueued by sync.run(conn,'_v3',rebuild=True))
+STOREGEAR_CATALOG_SUFFIX=_v3 uv run --env-file agent/storegear/.env python eval/hybrid_benchmark.py
+STOREGEAR_CATALOG_SUFFIX=_v3 uv run python eval/run_eval.py
+uv run python infra/sql/apply.py infra/sql/007_swap_catalog_v3.sql   # one transaction; old catalog kept as catalog_*_v2
+#  Job default argument --sync; Cloud Run Invoker ON the job for sg-ingestion:
+gcloud run jobs add-iam-policy-binding sg-ingest-worker --region europe-west1 --member=serviceAccount:sg-ingestion@storegear-prod-ag26.iam.gserviceaccount.com --role=roles/run.invoker
+gcloud scheduler jobs create http sg-ingest-sync --location europe-west1 --schedule="*/15 * * * *" --time-zone="Europe/Madrid" --http-method=POST --uri="https://europe-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/storegear-prod-ag26/jobs/sg-ingest-worker:run" --oauth-service-account-email=sg-ingestion@storegear-prod-ag26.iam.gserviceaccount.com
+# OPEN (21 Oct): Cloud Scheduler doesn't dispatch in this project; stuck jobs sg-ingest-sync-15min + zz-scheduler-probe (x2) to delete
+```
+
+## SMO-22 · Login and roles (2026-10-21; ADR-014)
+```bash
+#  Console: Identity Platform enabled (direct link: marketplace .../customer-identity), provider Email/Password only,
+#  Settings > Users: sign-up OFF; API key restricted to Identity Toolkit API + Token Service API;
+#  service account sg-api (Agent Platform User, Cloud SQL Client, Cloud SQL Instance User, Logs Writer) + IAM DB user
+uv run python infra/sql/apply.py infra/sql/008_api_rate.sql
+uv run python infra/users.py test-users                     # writes test credentials to agent/storegear/.env
+gcloud builds submit --config api/cloudbuild.yaml --substitutions=_TAG=v2
+gcloud run deploy sg-api --image europe-docker.pkg.dev/storegear-prod-ag26/storegear/sg-api:v2 --region europe-west1
+#  first deploy in the Console: public access, SA sg-api, max 2 instances, concurrency 10, timeout 300 s, 1 CPU / 1 GiB
+uv run --env-file agent/storegear/.env python eval/auth_tests.py   # 7/7
+```

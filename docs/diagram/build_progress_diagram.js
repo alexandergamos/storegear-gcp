@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const UPDATED = '2026-10-17';
-const HEADLINE = 'Phase 2: ingestion queue live on Cloud Run (SMO-19) · retries, dead letter + alert · next SMO-20 Drive sync';
+const HEADLINE = 'Phase 3: login + roles live (SMO-22, 7/7 auth tests) · threat model done · catalog rebuilt in the cloud · next SMO-23 guardrails';
 
 // ---------------------------------------------------------------- content (edit statuses here)
 const LAPTOP = [
@@ -26,6 +26,7 @@ const GCP = [ // [title, items]
     ['done', 'sg-agent · 6 roles'],
     ['done', 'sg-ingestion · 4 roles'],
     ['done', 'Secret: DB admin password'],
+    ['done', 'sg-api · login + roles · 7/7'],
   ]],
   ['Agent Platform (eu endpoint)', [
     ['done', 'Gemini 3.8 Flash · tested'],
@@ -36,7 +37,7 @@ const GCP = [ // [title, items]
   ['Data · Cloud SQL', [
     ['done', 'sg-catalog · PG18 · free trial'],
     ['done', 'Schema + least privilege'],
-    ['done', 'Catalog v2 · 12,792 chunks'],
+    ['done', 'Catalog v3 · cloud-built'],
   ]],
   ['Agent code', [
     ['done', 'Hybrid search · 17/17 · 0.6 s'],
@@ -46,22 +47,22 @@ const GCP = [ // [title, items]
   ['Ingestion pipeline', [
     ['done', 'Parser: Gemini + DocAI fallback'],
     ['done', 'Gate + queue · Cloud Run job'],
-    ['wip', 'Drive sync (SMO-20)'],
+    ['wip', 'Drive sync ✓ · scheduler ◐'],
   ]],
 ];
 const SOURCES = [
   ['done', 'n8n catalog export ✓'],
   ['done', 'Price/stock Sheet · live'],
-  ['todo', 'Drive manuals (SMO-20)'],
+  ['done', 'Drive · 10 manuals'],
   ['done', 'n8n baseline · 22 q ✓'],
 ];
 const PHASES = [
   ['done', 'Phase 0 · Foundations', '15-16 Oct'],
   ['done', 'Phase 1 · Working agent', '17-18 Oct'],
-  ['wip', 'Phase 2 · Ingestion', '22-25 Oct'],
-  ['todo', 'Phase 3 · Safety', '26-28 Oct'],
-  ['todo', 'Phase 4 · Ops', '29-30 Oct'],
-  ['todo', 'Final · n8n vs GCP', '31 Oct'],
+  ['done', 'Phase 2 · Ingestion', '19-21 Oct'],
+  ['wip', 'Phase 3 · Safety', '21-24 Oct'],
+  ['todo', 'Phase 4 · Ops', '25-29 Oct'],
+  ['todo', 'Final · n8n vs GCP', '30-31 Oct'],
 ];
 
 // ---------------------------------------------------------------- styling

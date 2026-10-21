@@ -1,6 +1,6 @@
 # ADR-014 — Authentication: Identity Platform tokens verified by a thin API on Cloud Run; the role comes only from the token
 
-- **Status:** Proposed (2026-10-21)
+- **Status:** Accepted (2026-10-21)
 - **Date:** 2026-10-21
 - **Linear:** SMO-22 (planned as "ADR-012"; renumbered)
 - **Deciders:** Alexander (decides) · Claude (drafts)
@@ -23,7 +23,7 @@ Facts that shape the options (checked 2026-10-21):
 | Role | Custom claim `role` set by an admin script | Same | IAM groups (needs Cloud Identity/Workspace) or claims | Passed through from the IdP | Our claim |
 | Fit here | ✅ No organization needed; free at our size; standard OIDC JWT | ✅ but A is the same with the enterprise options open | ❌ direct mode needs an organization; LB mode adds ~$18+/month and still needs A | ➖ extra component; per-user limits still in the app | ❌ we'd own user management and a signing secret |
 
-## Decision (proposed)
+## Decision
 
 ```
 client (web app later; eval and curl now)
@@ -53,6 +53,13 @@ Agent Runtime (unchanged agent; reads the role from state as today)
 ## Consequences
 - **Good:** the role can no longer be chosen by the caller; standard tokens (any future app or MCP client can use them); free at our size; 401/403/429 behaviour testable.
 - **Bad / accepted:** one more service to run (`sg-api`); rate limits per Cloud SQL round trip (a few ms); no IP-level DDoS protection without a load balancer.
+
+## Addendum (2026-10-21): built and tested
+- Identity Platform with **Email/Password only**; **sign-up disabled** (only `infra/users.py` creates accounts and roles). The auto-created API key is restricted to **Identity Toolkit API + Token Service API** (Firebase had left it open to ~25 APIs, including Cloud SQL Admin and Cloud Logging).
+- `sg-api` on Cloud Run (europe-west1, service account `sg-api`, public access because authentication is in the app, max 2 instances, concurrency 10, timeout 300 s, no OpenAPI route).
+- **`eval/auth_tests.py`: 7/7** against the deployed service: no token 401 · garbage token 401 · no role 403 · staff gets no internal figures ("No tengo esa información…", without revealing the document exists) · manager gets supplier cost 268 € and margin 33 % · `"role": "manager"` in the body is ignored · exhausted daily quota 429.
+- Lessons: Cloud Run's front end **reserves paths ending in "z"** (`/healthz` → 404; now `/health`); the Cloud SQL connector needs the `cloud-platform` scope as well as `sqlservice.login`.
+- Pending for SMO-28: the 22-question eval through `sg-api` (staff test user); removing Editor from the default Compute account once CI has its own build account.
 
 ## Revisit when
 The agent is exposed publicly at scale (→ external HTTPS load balancer + Cloud Armor rate limiting by IP); the shop gets a Google Workspace organization (→ IAP in front of `sg-api`, role from groups); or staff need single sign-on with another IdP (→ OIDC/SAML provider, tier-2 pricing).

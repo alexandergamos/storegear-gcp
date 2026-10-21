@@ -1,6 +1,6 @@
 # ADR-012 — Drive sync: a scheduled reconciliation loop, plus a side-table rebuild
 
-- **Status:** Proposed (2026-10-20)
+- **Status:** Accepted (2026-10-21)
 - **Date:** 2026-10-20
 - **Linear:** SMO-20
 - **Deciders:** Alexander (decides) · Claude (drafts)
@@ -20,7 +20,7 @@ Drive is the source of truth: the shop drops manuals into **"Shop Assitant"** (`
 
 **Reconciliation** is the reliability pattern behind A: don't trust events, compare *desired state* (Drive) with *actual state* (catalog) and fix the difference. It's how Kubernetes controllers and Terraform work. It's self-healing: if a run fails or a file was missed, the next run fixes it.
 
-## Decision (proposed)
+## Decision
 1. **`ingestion/sync.py`**, run by the same Cloud Run job before it drains the queue (`worker.py --sync`):
    - List PDFs in both folders (Drive API, `md5Checksum` included, no download).
    - Version key = `md5:access_level`, so a **move** between folders (same bytes, new level) is a new version.
@@ -33,6 +33,12 @@ Drive is the source of truth: the shop drops manuals into **"Shop Assitant"** (`
 ## Consequences
 - **Good:** no new infrastructure besides a scheduler trigger; can't miss changes; self-healing; the catalog is provably rebuilt from Drive by the Google pipeline alone; the live catalog is untouched until the swap.
 - **Bad / accepted:** up to ~15 min delay; each run lists Drive (2 API calls, far below quota); the rebuild costs ~$5 (parse + gate + embeddings for ~1,100 pages).
+
+## Addendum (2026-10-21): results
+- **Sync:** lists both folders (10 PDFs: 9 `staff`, 1 `manager`), enqueues differences; a second run enqueues 0.
+- **Full rebuild into `_v3`** by the Cloud Run job with **3 parallel tasks** (the queue's `SKIP LOCKED` split the 10 manuals with no collisions): 31 min. One manual hit an `eu` **504** and was retried by another worker 6 min later, untouched by anyone. `fold_common` rebuilt the 13 shared Polar sections. 12,574 chunks, 0 orphans, 0 quarantined, 2 Document AI batches.
+- **Gate:** eval 4.95 / 5.00 / 5.00 / 5.00, right manual in the top 5 17/17 (first 15/17), role filter OK, input tokens +14 % vs the laptop-built catalog. Swapped live with `007_swap_catalog_v3.sql` (queue rows moved with the tables, so the live sync enqueues 0). Deployed agent Q6 and Q18: 5/5/5/5.
+- **Trigger:** job default argument `--sync`; Cloud Run Invoker granted **on the job** to `sg-ingestion`. **Open:** Cloud Scheduler does not dispatch in this project (any job, any region, even an unauthenticated probe; deletes fail with "sync mutate calls cannot be queued"); API enabled the same day, no Google incident. Plan B if it persists: a scheduled Cloud Build trigger.
 
 ## Revisit when
 Manuals must be searchable within seconds of upload, or the folder grows to thousands of files (then: `changes.list` with a stored page token instead of full listings).

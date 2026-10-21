@@ -1,6 +1,6 @@
 # Progress summary
 
-*Updated 2026-10-20 (after SMO-19). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
+*Updated 2026-10-21 (after SMO-22). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
 
 ## In one paragraph
 We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and its tables, Spanish search and permissions are live. The catalog is loaded: 9,054 passages from 10 manuals, each with a Google embedding.
@@ -98,10 +98,25 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 - **First cloud run:** it failed once (the Drive API wasn't switched on), retried as designed, and succeeded: 10 chunks in 20 seconds.
 - **Security catch:** the job had started as Google's default account (Editor on everything), and the "impersonate itself" permission had been granted for the whole project instead of for each account. Both fixed and verified.
 
+### 15. Drive sync and a catalog rebuilt in the cloud (SMO-20)
+- **What:** every run, the job compares the two Drive folders with what's in the catalog and queues the differences (new, changed, moved between staff and manager, deleted). If Drive ever returns zero files, nothing is deleted.
+- **The Phase 2 test:** the whole catalog rebuilt from scratch by the cloud pipeline, three workers in parallel, 31 minutes. One manual hit a Google timeout and another worker finished it on its own. Same quality as before (4.95 / 5 / 5 / 5), now live.
+- **Open:** Cloud Scheduler isn't firing anything in the project yet (a Google-side problem; re-checking).
+
+### 16. Threat model (SMO-21)
+- What we protect (the internal document, prices, conversations), from whom, and through which doors, checked against the OWASP lists for AI apps and agents. Every risk has a defence or a written reason to accept it.
+- **Main finding:** the caller could choose the role. **Design rule:** the agent never gets a tool that sends or writes data outside without a human approving each action.
+
+### 17. Login and roles (SMO-22)
+- Shop staff sign in with email and password (Google Identity Platform). Only Alexander creates accounts and assigns roles; sign-up is off.
+- A small API (`sg-api`) is now the only door: no valid login → 401; no role → 403; too many requests → 429. The role comes from the login, never from the request.
+- **Proof, 7/7 tests on the live service:** staff asking for supplier costs gets "no tengo esa información"; a manager gets 268 € and 33 %; a staff user sending "role: manager" in the request gets nothing extra.
+
 ## What's next
 | Next | Issue | What happens |
 |---|---|---|
-| 1 | SMO-20 | Drive sync on a schedule: new, changed and deleted manuals reach the catalog on their own; full rebuild + eval |
+| 1 | SMO-23 | Guardrails: Model Armor on what staff type, PII masking, safe links and phone numbers in answers |
+| 2 | SMO-24 | Conversations: 30-day retention + the Phase 3 eval gate |
 
 ## Numbers to beat (n8n, 2026-10-11)
 Correctness 5.00 · Faithfulness 4.95 · Context 5.00 · Answer 5.00 · median 9.0 s · ~$0.008 per answer.
