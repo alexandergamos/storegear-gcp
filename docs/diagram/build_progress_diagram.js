@@ -47,7 +47,7 @@ const GCP = [ // [title, items]
   ['Ingestion pipeline', [
     ['done', 'Parser: Gemini + DocAI fallback'],
     ['done', 'Gate + queue · Cloud Run job'],
-    ['wip', 'Drive sync ✓ · scheduler ◐'],
+    ['done', 'Drive sync · every 15 min'],
   ]],
 ];
 const SOURCES = [

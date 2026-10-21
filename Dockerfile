@@ -8,4 +8,5 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY ingestion/ ingestion/
 ENV STOREGEAR_RUNNING_AS_SA=1 PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
-CMD ["/app/.venv/bin/python", "ingestion/worker.py"]
+# ENTRYPOINT, not CMD: Cloud Run job "arguments" REPLACE the image CMD, but are APPENDED to the ENTRYPOINT
+ENTRYPOINT ["/app/.venv/bin/python", "ingestion/worker.py"]

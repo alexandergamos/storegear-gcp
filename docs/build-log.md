@@ -251,16 +251,18 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 ## 15 · Drive sync + catalog rebuilt by the cloud pipeline (SMO-20) — 2026-10-21
 
 ### EN
-- **What:** ADR-012: a reconciliation loop (`ingestion/sync.py`, run by the job with `--sync`) compares Drive (desired) with the queue and catalog (actual) and enqueues upserts, moves (version key `md5:access`) and deletes; an empty listing never deletes. Full rebuild into `_v3` by 3 parallel tasks in 31 min; `fold_common` rebuilt the 13 shared Polar sections; eval 4.95/5/5/5; swapped live with the queue history. Cloud Scheduler trigger configured but not dispatching (Google-side).
+- **What:** ADR-012: a reconciliation loop (`ingestion/sync.py`, run by the job with `--sync`) compares Drive (desired) with the queue and catalog (actual) and enqueues upserts, moves (version key `md5:access`) and deletes; an empty listing never deletes. Full rebuild into `_v3` by 3 parallel tasks in 31 min; `fold_common` rebuilt the 13 shared Polar sections; eval 4.95/5/5/5; swapped live with the queue history. Cloud Scheduler every 15 min, verified (SYNC_DONE 10 listed, 0 queued).
 - **Why:** Drive is the source of truth; the catalog must follow it without anyone running scripts.
 - **Learned:** (1) **Reconciliation beats events** at this scale: it can't miss a change, and a failed run is fixed by the next one. (2) **Parallel workers for free:** `SKIP LOCKED` meant three Cloud Run tasks shared the queue with zero coordination code, and a 504 on one manual was absorbed by another worker. (3) **Move the bookkeeping with the data:** the swap also re-targets the queue rows, or the live sync would have re-ingested everything.
-- **Next:** confirm the scheduler; SMO-21.
+- **Also learned:** a newly enabled API (Cloud Scheduler) dispatched nothing for ~1 h 45 min; and Cloud Run job arguments REPLACE the image CMD (use ENTRYPOINT).
+- **Next:** SMO-21.
 
 ### ES
-- **Qué:** ADR-012: un bucle de reconciliación (`ingestion/sync.py`, lo ejecuta el job con `--sync`) compara Drive (estado deseado) con la cola y el catálogo (estado real) y encola altas, cambios, movimientos (clave de versión `md5:acceso`) y bajas; un listado vacío nunca borra. Reconstrucción completa en `_v3` con 3 tareas en paralelo en 31 min; `fold_common` recreó las 13 secciones comunes de Polar; eval 4,95/5/5/5; activado junto con el historial de la cola. El disparador de Cloud Scheduler está configurado pero no se ejecuta (problema de Google).
+- **Qué:** ADR-012: un bucle de reconciliación (`ingestion/sync.py`, lo ejecuta el job con `--sync`) compara Drive (estado deseado) con la cola y el catálogo (estado real) y encola altas, cambios, movimientos (clave de versión `md5:acceso`) y bajas; un listado vacío nunca borra. Reconstrucción completa en `_v3` con 3 tareas en paralelo en 31 min; `fold_common` recreó las 13 secciones comunes de Polar; eval 4,95/5/5/5; activado junto con el historial de la cola. Cloud Scheduler cada 15 min, verificado (SYNC_DONE: 10 listados, 0 encolados).
 - **Por qué:** Drive es la fuente de verdad; el catálogo tiene que seguirla sin que nadie lance scripts.
 - **Aprendido:** (1) **La reconciliación gana a los eventos** a esta escala: no puede perder un cambio, y una ejecución fallida la arregla la siguiente. (2) **Workers en paralelo gratis:** con `SKIP LOCKED`, tres tareas de Cloud Run se repartieron la cola sin código de coordinación, y un 504 en un manual lo absorbió otro worker. (3) **Mover la contabilidad con los datos:** el cambio de tablas también reasigna las filas de la cola; si no, la sincronización habría vuelto a procesarlo todo.
-- **Siguiente:** confirmar el scheduler; SMO-21.
+- **También:** una API recién activada (Cloud Scheduler) no ejecutó nada durante ~1 h 45 min; y los argumentos de un job de Cloud Run SUSTITUYEN al CMD de la imagen (hay que usar ENTRYPOINT).
+- **Siguiente:** SMO-21.
 
 ---
 

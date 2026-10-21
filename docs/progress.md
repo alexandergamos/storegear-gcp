@@ -101,7 +101,7 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 ### 15. Drive sync and a catalog rebuilt in the cloud (SMO-20)
 - **What:** every run, the job compares the two Drive folders with what's in the catalog and queues the differences (new, changed, moved between staff and manager, deleted). If Drive ever returns zero files, nothing is deleted.
 - **The Phase 2 test:** the whole catalog rebuilt from scratch by the cloud pipeline, three workers in parallel, 31 minutes. One manual hit a Google timeout and another worker finished it on its own. Same quality as before (4.95 / 5 / 5 / 5), now live.
-- **Open:** Cloud Scheduler isn't firing anything in the project yet (a Google-side problem; re-checking).
+- **Automatic every 15 minutes** since 21 Oct. It took two surprises: a newly enabled Google API needed ~1 h 45 min to start working, and the job's argument replaced its start command instead of being added to it.
 
 ### 16. Threat model (SMO-21)
 - What we protect (the internal document, prices, conversations), from whom, and through which doors, checked against the OWASP lists for AI apps and agents. Every risk has a defence or a written reason to accept it.

@@ -232,7 +232,9 @@ uv run python infra/sql/apply.py infra/sql/007_swap_catalog_v3.sql   # one trans
 #  Job default argument --sync; Cloud Run Invoker ON the job for sg-ingestion:
 gcloud run jobs add-iam-policy-binding sg-ingest-worker --region europe-west1 --member=serviceAccount:sg-ingestion@storegear-prod-ag26.iam.gserviceaccount.com --role=roles/run.invoker
 gcloud scheduler jobs create http sg-ingest-sync --location europe-west1 --schedule="*/15 * * * *" --time-zone="Europe/Madrid" --http-method=POST --uri="https://europe-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/storegear-prod-ag26/jobs/sg-ingest-worker:run" --oauth-service-account-email=sg-ingestion@storegear-prod-ag26.iam.gserviceaccount.com
-# OPEN (21 Oct): Cloud Scheduler doesn't dispatch in this project; stuck jobs sg-ingest-sync-15min + zz-scheduler-probe (x2) to delete
+# Cloud Scheduler needed ~1 h 45 min after enabling the API before it dispatched anything.
+# Job command (args REPLACE the image CMD; from PowerShell, quote the comma list):
+#   gcloud run jobs update sg-ingest-worker --region europe-west1 --command=/app/.venv/bin/python "--args=ingestion/worker.py,--sync"
 ```
 
 ## SMO-22 · Login and roles (2026-10-21; ADR-014)
