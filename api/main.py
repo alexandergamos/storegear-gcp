@@ -1,7 +1,7 @@
 """SMO-22 · sg-api: the only door to the agent for people (ADR-014).
 
     POST /chat  {"message": "...", "session_id": optional}   Authorization: Bearer <Identity Platform ID token>
-    GET  /healthz
+    GET  /health
 
 1. Verify the ID token (Google public keys, issuer + audience = this project, expiry)         -> 401
 2. role = custom claim "role" in {staff, manager}; set only by infra/users.py (admin)          -> 403
@@ -55,7 +55,9 @@ def db():
     global _connector
     with _lock:
         if _connector is None:
-            creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/sqlservice.login"])
+            # the connector needs cloud-platform too (it asks the Cloud SQL Admin API for connection settings)
+            creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/sqlservice.login",
+                                                   "https://www.googleapis.com/auth/cloud-platform"])
             _connector = Connector(credentials=creds)
     return _connector.connect(INSTANCE, "pg8000", user=DB_USER, db="storegear", enable_iam_auth=True)
 
@@ -96,8 +98,8 @@ class Ask(BaseModel):
     session_id: str | None = None
 
 
-@app.get("/healthz")
-def healthz() -> dict:
+@app.get("/health")   # not /healthz: Cloud Run's front end reserves paths ending in "z"
+def health() -> dict:
     return {"ok": True}
 
 

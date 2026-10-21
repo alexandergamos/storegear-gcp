@@ -1,6 +1,8 @@
 # SMO-22 · build the sg-api image with api/Dockerfile (the root Dockerfile is the ingestion worker's)
 steps:
   - name: gcr.io/cloud-builders/docker
-    args: ["build", "-f", "api/Dockerfile", "-t", "europe-docker.pkg.dev/storegear-prod-ag26/storegear/sg-api:v1", "."]
+    args: ["build", "-f", "api/Dockerfile", "-t", "europe-docker.pkg.dev/storegear-prod-ag26/storegear/sg-api:${_TAG}", "."]
 images:
-  - europe-docker.pkg.dev/storegear-prod-ag26/storegear/sg-api:v1
+  - europe-docker.pkg.dev/storegear-prod-ag26/storegear/sg-api:${_TAG}
+substitutions:
+  _TAG: v1
