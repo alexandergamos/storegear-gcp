@@ -14,6 +14,7 @@ import random
 import threading
 import time
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 
 import google.auth
 import google.auth.transport.requests
@@ -24,6 +25,8 @@ from google.cloud.sql.connector import Connector
 from google.oauth2 import id_token
 from pydantic import BaseModel, Field
 
+import guards
+
 warnings.filterwarnings("ignore")
 PROJECT = os.getenv("STOREGEAR_PROJECT_ID", "storegear-prod-ag26")
 AGENT = os.getenv("STOREGEAR_AGENT_RESOURCE", "projects/1066603052728/locations/eu/reasoningEngines/1557471414884237312")
@@ -32,6 +35,12 @@ INSTANCE = f"{PROJECT}:europe-west1:sg-catalog"
 DB_USER = os.getenv("STOREGEAR_API_DB_USER", f"sg-api@{PROJECT}.iam")
 PER_MIN, PER_DAY = int(os.getenv("STOREGEAR_RATE_PER_MIN", "20")), int(os.getenv("STOREGEAR_RATE_PER_DAY", "300"))
 ROLES = {"staff", "manager"}
+POOL = ThreadPoolExecutor(8)
+REPLY = {   # what the employee sees when a guardrail stops a request (ADR-015)
+    "blocked": "Lo siento, no puedo ayudar con esa petición. Puedo responder sobre los relojes del catálogo, su precio y stock, y las políticas de la tienda.",
+    "off_topic": "Solo puedo ayudarte con los relojes del catálogo (especificaciones, uso, precio y stock) y con las políticas de la tienda. ¿Qué necesitas saber?",
+    "leak": "No puedo compartir detalles internos sobre cómo funciono. ¿En qué te ayudo con el catálogo?",
+}
 
 app = FastAPI(title="StoreGear API", docs_url=None, redoc_url=None, openapi_url=None)   # no public API map
 app.add_middleware(CORSMiddleware, allow_origins=[o for o in os.getenv("STOREGEAR_ALLOWED_ORIGINS", "").split(",") if o],
@@ -106,6 +115,18 @@ def health() -> dict:
 @app.post("/chat")
 def chat(body: Ask, who: dict = Depends(user)) -> dict:
     rate_limit(who["uid"])
+    # INPUT (ADR-015): PII masked first, so nothing downstream (Model Armor, the model, the session, logs) sees it
+    message, pii_in = guards.mask_pii(body.message)
+    f_armor, f_topic = POOL.submit(guards.armor, message), POOL.submit(guards.on_topic, message)
+    try:
+        hits, topic_ok = f_armor.result(), f_topic.result()
+    except Exception:  # noqa: BLE001  fail closed: an unchecked question never reaches the agent
+        raise HTTPException(503, "guardrail unavailable") from None
+    guard = {"pii_in": pii_in}
+    if hits:
+        return {"session_id": body.session_id, "answer": REPLY["blocked"], "guard": {**guard, "blocked": "input", "filters": hits}}
+    if not topic_ok:
+        return {"session_id": body.session_id, "answer": REPLY["off_topic"], "guard": {**guard, "blocked": "off_topic"}}
     r = remote()
     sid = body.session_id
     if sid:
@@ -118,7 +139,7 @@ def chat(body: Ask, who: dict = Depends(user)) -> dict:
     if not sid:
         sid = r.create_session(user_id=who["uid"], state={"user:role": who["role"]})["id"]
     t0, answer, error = time.time(), [], None
-    for ev in r.stream_query(user_id=who["uid"], session_id=sid, message=body.message):
+    for ev in r.stream_query(user_id=who["uid"], session_id=sid, message=message):
         if ev.get("error_code"):
             error = ev["error_code"]
         for p in (ev.get("content") or {}).get("parts", []) or []:
@@ -126,4 +147,18 @@ def chat(body: Ask, who: dict = Depends(user)) -> dict:
                 answer.append(p["text"])
     if not answer:
         raise HTTPException(502, f"agent error: {error or 'empty answer'}")
-    return {"session_id": sid, "answer": answer[-1], "seconds": round(time.time() - t0, 1)}
+    # OUTPUT: leaks of how we're built, links outside the brands, PII, and Model Armor's harm filters
+    text = answer[-1]
+    found_leak = guards.leak(text)
+    if found_leak:
+        return {"session_id": sid, "answer": REPLY["leak"], "seconds": round(time.time() - t0, 1), "guard": {**guard, "blocked": "leak", "leak": found_leak}}
+    text, links = guards.strip_links(text)
+    text, pii_out = guards.mask_pii(text)
+    try:
+        hits_out = guards.armor(text, response=True)
+    except Exception:  # noqa: BLE001
+        raise HTTPException(503, "guardrail unavailable") from None
+    if hits_out:
+        return {"session_id": sid, "answer": REPLY["blocked"], "seconds": round(time.time() - t0, 1), "guard": {**guard, "blocked": "output", "filters": hits_out}}
+    return {"session_id": sid, "answer": text, "seconds": round(time.time() - t0, 1),
+            "guard": {**guard, "pii_out": pii_out, "links_removed": links}}

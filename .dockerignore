@@ -7,3 +7,11 @@
 ingestion/__pycache__/
 !api/
 api/__pycache__/
+# the agent's prompt, only (sg-api's leak check compares answers with it); never agent/storegear/.env
+!agent/
+agent/*
+!agent/storegear/
+agent/storegear/*
+!agent/storegear/prompts/
+agent/storegear/prompts/*
+!agent/storegear/prompts/system_es.md

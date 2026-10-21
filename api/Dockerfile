@@ -6,5 +6,6 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY api/ api/
+COPY agent/storegear/prompts/system_es.md api/system_es.md
 ENV PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
 CMD ["/app/.venv/bin/uvicorn", "--app-dir", "api", "main:app", "--host", "0.0.0.0", "--port", "8080"]

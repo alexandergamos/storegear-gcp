@@ -12,6 +12,7 @@ Parity with the n8n Agent Block (ADR-006):
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 from google.adk.agents import Agent
@@ -70,6 +71,8 @@ def consultar_precio_stock(file_id: str) -> dict:
     Args:
         file_id: El fileId del producto, copiado tal cual del atributo fileId de un resultado <manual>.
     """
+    if not re.fullmatch(r"[A-Za-z0-9_-]{20,80}", file_id.strip()):   # a Drive id; anything else never reaches the sheet
+        return {"status": "error", "message": "fileId no válido: usa el atributo fileId de un resultado <manual>."}
     return lookup_price_stock(file_id)
 
 
@@ -113,5 +116,9 @@ root_agent = Agent(
         temperature=0.2,
         http_options=types.HttpOptions(timeout=int(os.getenv("STOREGEAR_MODEL_TIMEOUT_MS", "15000"))),
         thinking_config=types.ThinkingConfig(thinking_level=os.getenv("STOREGEAR_THINKING", "low")),
+        # Explicit on purpose: for Gemini 2.5 and later, an unset threshold means OFF (no harm blocking at all) (ADR-015)
+        safety_settings=[types.SafetySetting(category=c, threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE) for c in (
+            types.HarmCategory.HARM_CATEGORY_HARASSMENT, types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT)],
     ),
 )
