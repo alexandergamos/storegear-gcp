@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const UPDATED = '2026-10-17';
-const HEADLINE = 'Phase 3: login + roles live (SMO-22, 7/7 auth tests) · threat model done · catalog rebuilt in the cloud · next SMO-23 guardrails';
+const HEADLINE = 'Phase 3: guardrails live (SMO-23, 10/10) · login + roles (SMO-22) · next SMO-24 sessions + retention';
 
 // ---------------------------------------------------------------- content (edit statuses here)
 const LAPTOP = [
@@ -27,6 +27,7 @@ const GCP = [ // [title, items]
     ['done', 'sg-ingestion · 4 roles'],
     ['done', 'Secret: DB admin password'],
     ['done', 'sg-api · login + roles · 7/7'],
+    ['done', 'Guardrails + PII · 10/10'],
   ]],
   ['Agent Platform (eu endpoint)', [
     ['done', 'Gemini 3.8 Flash · tested'],

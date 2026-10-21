@@ -21,6 +21,7 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 | 15 | 2026-10-21 | SMO-20 | Drive sync + catalog rebuilt by the cloud pipeline |
 | 16 | 2026-10-21 | SMO-21 | Threat model: OWASP LLM + Agentic, trifecta kept broken |
 | 17 | 2026-10-21 | SMO-22 | Login and roles: Identity Platform + sg-api, 7/7 |
+| 18 | 2026-10-21 | SMO-23 | Guardrails + PII at the door, safety settings on, 10/10 |
 
 ---
 
@@ -295,5 +296,21 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Por qué:** el hueco principal del modelo de amenazas: quien llamaba elegía el rol.
 - **Aprendido:** (1) **IAP quedó fuera** por un motivo que conviene saber: su modo directo en Cloud Run exige una organización, y un proyecto personal no la tiene. (2) **Cloud Run "público" + autenticación en la app** es el patrón correcto cuando los usuarios no son identidades de Google Cloud; el 401 llega antes de cualquier trabajo. (3) **Los valores por defecto vuelven a ser amplios:** la clave que creó Firebase estaba abierta a ~25 APIs, incluida Cloud SQL Admin. (4) Dos trampas pequeñas: Cloud Run reserva las rutas que acaban en "z" (`/healthz`), y el conector de Cloud SQL necesita el scope `cloud-platform`.
 - **Siguiente:** SMO-23, guardrails.
+
+---
+
+## 18 · Guardrails + PII at the door, safety settings on (SMO-23) — 2026-10-21
+
+### EN
+- **What:** ADR-015 accepted. In `sg-api`: deterministic PII masking first (email, ES phone, DNI/NIE with check letter, IBAN mod-97, card Luhn), then Model Armor (`sg-guard`, eu) and a Gemini topic check in parallel, fail closed; on output a deterministic leak check (tool names, internal ids, 12-word overlaps with the prompt minus its quoted reply templates), a link allowlist, PII again and Model Armor's response filters. In the agent: explicit safety settings and `file_id` validation. `eval/guardrail_tests.py` 10/10 incl. the n8n cases and the 22 questions with no false blocks. Eval 5.00 on the second run (4.64 on the first: a 504 and a retrieval miss).
+- **Why:** the threat model's input/output items (LLM01, LLM02, LLM05, LLM07, ASI02).
+- **Learned:** (1) **Gemini's harm filters are OFF by default** from 2.5 on; nobody notices until they check. (2) **Deterministic first:** a DNI check letter is exact and free; an LLM is for what a rule can't decide (topic). (3) **Encode past false positives as tests:** n8n's two (manager policy as off-topic, "documento interno" as a leak) are now permanent cases. (4) **One eval run is not a gate:** the same agent scored 4.64 and 5.00 an hour apart.
+- **Next:** SMO-24 sessions and retention.
+
+### ES
+- **Qué:** ADR-015 aceptado. En `sg-api`: primero el enmascarado determinista de datos personales (email, teléfono español, DNI/NIE con letra de control, IBAN mod-97, tarjeta Luhn); después Model Armor (`sg-guard`, eu) y un control de tema con Gemini en paralelo, fallando en cerrado; a la salida, un detector determinista de filtraciones (nombres de herramientas, identificadores internos, coincidencias de 12 palabras con el prompt sin sus plantillas de respuesta), una lista de dominios permitidos para los enlaces, datos personales otra vez y los filtros de respuesta de Model Armor. En el agente: filtros de seguridad explícitos y validación de `file_id`. `eval/guardrail_tests.py` 10/10, incluidos los casos de n8n y las 22 preguntas sin ningún bloqueo falso. Eval 5,00 en la segunda ejecución (4,64 en la primera: un 504 y un fallo de búsqueda).
+- **Por qué:** los puntos de entrada y salida del modelo de amenazas (LLM01, LLM02, LLM05, LLM07, ASI02).
+- **Aprendido:** (1) **Los filtros de daño de Gemini vienen APAGADOS por defecto** desde la 2.5; nadie lo nota hasta que lo comprueba. (2) **Primero lo determinista:** la letra de un DNI es exacta y gratis; el LLM, para lo que una regla no puede decidir (el tema). (3) **Convertir los falsos positivos pasados en tests:** los dos de n8n (política de encargado como fuera de tema, "documento interno" como filtración) son ahora casos permanentes. (4) **Una sola ejecución del eval no es una barrera:** el mismo agente sacó 4,64 y 5,00 con una hora de diferencia.
+- **Siguiente:** SMO-24, sesiones y retención.
 
 ---

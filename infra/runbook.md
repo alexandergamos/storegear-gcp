@@ -249,3 +249,14 @@ gcloud run deploy sg-api --image europe-docker.pkg.dev/storegear-prod-ag26/store
 #  first deploy in the Console: public access, SA sg-api, max 2 instances, concurrency 10, timeout 300 s, 1 CPU / 1 GiB
 uv run --env-file agent/storegear/.env python eval/auth_tests.py   # 7/7
 ```
+
+## SMO-23 · Guardrails + PII (2026-10-21; ADR-015)
+```bash
+#  Console: Model Armor template sg-guard (multi-region eu): PI+jailbreak medium+, 4 RAI filters medium+, malicious URLs on, SDP off
+#  IAM: sg-api + Model Armor User
+gcloud builds submit --config api/cloudbuild.yaml --substitutions=_TAG=v3
+gcloud run deploy sg-api --image europe-docker.pkg.dev/storegear-prod-ag26/storegear/sg-api:v3 --region europe-west1
+uv run python infra/deploy_agent_runtime.py --update          # explicit safety settings + file_id validation
+uv run --env-file agent/storegear/.env python eval/guardrail_tests.py --eval   # 10/10
+uv run python eval/run_eval.py --remote
+```

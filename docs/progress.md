@@ -1,6 +1,6 @@
 # Progress summary
 
-*Updated 2026-10-21 (after SMO-22). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
+*Updated 2026-10-21 (after SMO-23). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
 
 ## In one paragraph
 We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and its tables, Spanish search and permissions are live. The catalog is loaded: 9,054 passages from 10 manuals, each with a Google embedding.
@@ -112,11 +112,16 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 - A small API (`sg-api`) is now the only door: no valid login → 401; no role → 403; too many requests → 429. The role comes from the login, never from the request.
 - **Proof, 7/7 tests on the live service:** staff asking for supplier costs gets "no tengo esa información"; a manager gets 268 € and 33 %; a staff user sending "role: manager" in the request gets nothing extra.
 
+### 18. Guardrails and personal data (SMO-23)
+- **At the door (sg-api), in order:** personal data is masked first (email, phone, DNI/NIE with the check letter verified, IBAN, card), so the model, the conversation history and the logs never see it. Then Google's Model Armor (jailbreaks, sexual, hateful, harassing or dangerous content) and a quick topic check run in parallel. On the way out: no tool names or prompt fragments, no links outside the brands' websites, personal data masked again.
+- **Found on the way:** Gemini's own safety filters are **off by default** in recent models. The agent now sets them explicitly.
+- **Proof, 10/10 on the live service:** the n8n test cases (jailbreak, paella, internal tools, explicit request, personal data) plus the two n8n false positives that must not return (a manager's policy question; an answer citing the internal document). The 22 eval questions pass through without a single false block.
+- **A caveat worth knowing:** one eval run scored 4.64 (a Google timeout plus a search that ranked the right section 7th of 5 shown), the next 5.00. Quality holds, but a single run is a noisy gate: SMO-28 will take that into account.
+
 ## What's next
 | Next | Issue | What happens |
 |---|---|---|
-| 1 | SMO-23 | Guardrails: Model Armor on what staff type, PII masking, safe links and phone numbers in answers |
-| 2 | SMO-24 | Conversations: 30-day retention + the Phase 3 eval gate |
+| 1 | SMO-24 | Conversations: 30-day retention + the Phase 3 eval gate |
 
 ## Numbers to beat (n8n, 2026-10-11)
 Correctness 5.00 · Faithfulness 4.95 · Context 5.00 · Answer 5.00 · median 9.0 s · ~$0.008 per answer.
