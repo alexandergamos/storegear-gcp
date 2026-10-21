@@ -22,6 +22,7 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 | 16 | 2026-10-21 | SMO-21 | Threat model: OWASP LLM + Agentic, trifecta kept broken |
 | 17 | 2026-10-21 | SMO-22 | Login and roles: Identity Platform + sg-api, 7/7 |
 | 18 | 2026-10-21 | SMO-23 | Guardrails + PII at the door, safety settings on, 10/10 |
+| 19 | 2026-10-22 | SMO-24 | Sessions with a 30-day TTL, history without the model; Phase 3 gate |
 
 ---
 
@@ -312,5 +313,21 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Por qué:** los puntos de entrada y salida del modelo de amenazas (LLM01, LLM02, LLM05, LLM07, ASI02).
 - **Aprendido:** (1) **Los filtros de daño de Gemini vienen APAGADOS por defecto** desde la 2.5; nadie lo nota hasta que lo comprueba. (2) **Primero lo determinista:** la letra de un DNI es exacta y gratis; el LLM, para lo que una regla no puede decidir (el tema). (3) **Convertir los falsos positivos pasados en tests:** los dos de n8n (política de encargado como fuera de tema, "documento interno" como filtración) son ahora casos permanentes. (4) **Una sola ejecución del eval no es una barrera:** el mismo agente sacó 4,64 y 5,00 con una hora de diferencia.
 - **Siguiente:** SMO-24, sesiones y retención.
+
+---
+
+## 19 · Sessions with a 30-day TTL, history without the model; Phase 3 gate (SMO-24) — 2026-10-22
+
+### EN
+- **What:** ADR-016 accepted: Agent Platform Sessions with a 30-day TTL set by `sg-api` (1 day for tests), history endpoints with no model call, a retention audit (144 sessions moved from the 365-day default), no Memory Bank. `session_tests` 6/6 (follow-up, history 0.39 s, cross-user 404 ×3, 30.00-day expiry, delete). Phase 3 gate: remote eval 5.00 / 4.91 / 5.00 / 5.00 after raising the sections given to the agent from 5 to 7.
+- **Why:** per-employee conversations with privacy by design (GDPR storage limitation, right to erasure).
+- **Learned:** (1) **Check the platform default:** sessions lived a year unless told otherwise. (2) **The gate found a real retrieval weakness:** the rebuilt catalog pushed one answer from 5th to 7th; the duplicate question doubled the hit. (3) **The eval itself had a bug:** in remote mode it rebuilt the judge's context with 5 sections while the agent used 7, so correct answers were scored as unfaithful. The harness now mirrors the deployed settings. (4) **Availability is the new top risk:** one run lost 9 of 22 questions to Google 500/504 errors.
+- **Next:** SMO-27 (moved up), then SMO-25/26.
+
+### ES
+- **Qué:** ADR-016 aceptado: Agent Platform Sessions con un TTL de 30 días que fija `sg-api` (1 día para tests), historial sin llamar al modelo, una auditoría de retención (144 sesiones pasaron del valor por defecto de 365 días) y sin Memory Bank. `session_tests` 6/6 (seguimiento, historial en 0,39 s, 404 entre usuarios ×3, caducidad a 30,00 días, borrado). Barrera de la fase 3: eval remoto 5,00 / 4,91 / 5,00 / 5,00 tras subir de 5 a 7 las secciones que recibe el agente.
+- **Por qué:** conversaciones por empleado con privacidad desde el diseño (limitación del plazo de conservación, derecho de supresión).
+- **Aprendido:** (1) **Revisar el valor por defecto de la plataforma:** las sesiones vivían un año si nadie decía lo contrario. (2) **La barrera encontró una debilidad real de búsqueda:** el catálogo reconstruido empujó una respuesta del 5.º al 7.º puesto, y la pregunta duplicada dobló el golpe. (3) **El propio eval tenía un fallo:** en modo remoto reconstruía el contexto del juez con 5 secciones mientras el agente usaba 7, y puntuaba respuestas correctas como infieles. Ahora replica la configuración desplegada. (4) **La disponibilidad es el nuevo riesgo principal:** una ejecución perdió 9 de 22 preguntas por errores 500/504 de Google.
+- **Siguiente:** SMO-27 (adelantado), luego SMO-25/26.
 
 ---

@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const UPDATED = '2026-10-17';
-const HEADLINE = 'Phase 3: guardrails live (SMO-23, 10/10) · login + roles (SMO-22) · next SMO-24 sessions + retention';
+const HEADLINE = 'Phase 3 closed: login, guardrails, 30-day sessions · eval 5/4.91/5/5 · top risk now: eu endpoint errors (SMO-27)';
 
 // ---------------------------------------------------------------- content (edit statuses here)
 const LAPTOP = [
@@ -32,7 +32,7 @@ const GCP = [ // [title, items]
   ['Agent Platform (eu endpoint)', [
     ['done', 'Gemini 3.8 Flash · tested'],
     ['done', 'Agent Runtime · eu · 3.0 s'],
-    ['wip', 'Sessions ✓ · Memory (SMO-24)'],
+    ['done', 'Sessions · 30-day TTL'],
     ['todo', 'Eval + Observability'],
   ]],
   ['Data · Cloud SQL', [
@@ -61,8 +61,8 @@ const PHASES = [
   ['done', 'Phase 0 · Foundations', '15-16 Oct'],
   ['done', 'Phase 1 · Working agent', '17-18 Oct'],
   ['done', 'Phase 2 · Ingestion', '19-21 Oct'],
-  ['wip', 'Phase 3 · Safety', '21-24 Oct'],
-  ['todo', 'Phase 4 · Ops', '25-29 Oct'],
+  ['done', 'Phase 3 · Safety', '21-22 Oct'],
+  ['wip', 'Phase 4 · Ops', '22-29 Oct'],
   ['todo', 'Final · n8n vs GCP', '30-31 Oct'],
 ];
 

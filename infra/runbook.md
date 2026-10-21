@@ -260,3 +260,13 @@ uv run python infra/deploy_agent_runtime.py --update          # explicit safety 
 uv run --env-file agent/storegear/.env python eval/guardrail_tests.py --eval   # 10/10
 uv run python eval/run_eval.py --remote
 ```
+
+## SMO-24 · Sessions + retention (2026-10-22; ADR-016)
+```bash
+gcloud builds submit --config api/cloudbuild.yaml --substitutions=_TAG=v4
+gcloud run deploy sg-api --image europe-docker.pkg.dev/storegear-prod-ag26/storegear/sg-api:v4 --region europe-west1
+uv run python infra/sessions_retention.py --dry-run && uv run python infra/sessions_retention.py   # audit, then enforce 30 d
+uv run --env-file agent/storegear/.env python eval/session_tests.py      # 6/6
+uv run python infra/deploy_agent_runtime.py --update                    # STOREGEAR_RETURN_N=7
+uv run python eval/run_eval.py --remote                                 # mirrors the deployed RETURN_N; run twice
+```

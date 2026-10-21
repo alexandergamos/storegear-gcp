@@ -1,6 +1,6 @@
 # Progress summary
 
-*Updated 2026-10-21 (after SMO-23). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
+*Updated 2026-10-22 (after SMO-24, Phase 3 closed). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
 
 ## In one paragraph
 We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and its tables, Spanish search and permissions are live. The catalog is loaded: 9,054 passages from 10 manuals, each with a Google embedding.
@@ -118,10 +118,17 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 - **Proof, 10/10 on the live service:** the n8n test cases (jailbreak, paella, internal tools, explicit request, personal data) plus the two n8n false positives that must not return (a manager's policy question; an answer citing the internal document). The 22 eval questions pass through without a single false block.
 - **A caveat worth knowing:** one eval run scored 4.64 (a Google timeout plus a search that ranked the right section 7th of 5 shown), the next 5.00. Quality holds, but a single run is a noisy gate: SMO-28 will take that into account.
 
+### 19. Conversations and the 30-day rule (SMO-24) — Phase 3 closed
+- **What:** each employee has their own conversations; follow-ups work ("¿Y hay stock?" after asking about the Ignite 2). They can list, read and delete their own history without the model being called, and nobody else can see it (another user gets "not found").
+- **Retention:** Google kept conversations **for a year by default**. Now each one is deleted after 30 days, and a small audit script checks it (it fixed 144 old test conversations).
+- **What the final check found:** one question (and its duplicate) failed because the right manual section came 7th and the agent only read 5. The agent now reads 7: quality back to 5/5/5/5, about 11 % more text per answer. A smarter fix (a "reranker" that reorders results) is planned as SMO-33.
+- **The real risk now:** in one run, Google's European endpoint failed 9 of 22 questions with server errors. Quality is fine; availability isn't yet. That's next (SMO-27).
+
 ## What's next
 | Next | Issue | What happens |
 |---|---|---|
-| 1 | SMO-24 | Conversations: 30-day retention + the Phase 3 eval gate |
+| 1 | SMO-27 (moved up) | When Google's endpoint fails: retries, a friendly reply instead of an error, an alert, and a decision on a fallback |
+| 2 | SMO-25 / 26 | Tracing and real cost per answer |
 
 ## Numbers to beat (n8n, 2026-10-11)
 Correctness 5.00 · Faithfulness 4.95 · Context 5.00 · Answer 5.00 · median 9.0 s · ~$0.008 per answer.
