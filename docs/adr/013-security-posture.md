@@ -8,7 +8,7 @@
 ## Context
 Phase 3 adds authentication, guardrails, PII handling and memory. Before building defences we need to know what we defend (assets), from whom (actors), through where (entry points) and which risks we accept. The full analysis is in [`docs/threat-model.md`](../threat-model.md), reviewed against the OWASP Top 10 for LLM Applications 2025 and the OWASP Top 10 for Agentic Applications (Dec 2025).
 
-## Decision (proposed)
+## Decision
 1. **Defence in depth, five layers.** No single control is trusted alone:
    | Layer | Controls |
    |---|---|
