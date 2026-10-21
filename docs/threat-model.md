@@ -95,10 +95,10 @@ Simon Willison's "lethal trifecta": an agent is exploitable for data theft when 
 | ASI09 Human-Agent Trust Exploitation | Yes: staff may over-trust answers | ✅ Source cited in every answer · ✅ "No lo sé" instead of guessing · Accepted: final responsibility for a sale stays with the employee |
 | ASI10 Rogue Agents | **No**: no autonomy beyond a single request | Accepted (N/A) |
 
-## 8. Open questions for Alexander
+## 8. Answers from Alexander (2026-10-21)
 
-1. **Who can edit the price sheet (E3)?** Whoever can edit it controls the prices the agent quotes. List the editors; ideally only the person responsible for prices.
-2. **Who can write to the Drive folders (E2)?** Everyone with write access can plant content. The injection gate is the control, but fewer writers means fewer attempts.
+1. **Price sheet (E3):** only Alexander (manager) can edit it. Accepted risk: a single editor, so integrity depends on his account (2-step verification recommended).
+2. **Drive folders (E2):** only Alexander can write to them. The injection gate stays as defence in depth for vendor PDFs and a compromised account.
 
 ## 9. Order of the remaining work (what this threat model changes)
 

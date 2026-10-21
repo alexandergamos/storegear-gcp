@@ -1,6 +1,6 @@
 # ADR-013 — Security posture: defence in depth, trifecta kept broken, risks owned in the threat model
 
-- **Status:** Proposed (2026-10-21)
+- **Status:** Accepted (2026-10-21)
 - **Date:** 2026-10-21
 - **Linear:** SMO-21 (planned as "ADR-011"; renumbered: 011 and 012 went to ingestion orchestration and Drive sync. SMO-22 auth → ADR-014, SMO-23 guardrails → ADR-015)
 - **Deciders:** Alexander (decides) · Claude (drafts)
