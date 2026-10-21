@@ -98,7 +98,7 @@ REMOTE = None  # Agent Runtime handle when --remote
 def run_agent_remote(question: str) -> dict:
     """Same record as run_agent, from the DEPLOYED agent. Pre-retrieval runs inside the cloud process, so it is
     recomputed here with the same search, DB and question (deterministic) to show the judge what the model saw."""
-    session = REMOTE.create_session(user_id="eval", state={"user:role": "staff"})
+    session = REMOTE.create_session(user_id="eval", state={"user:role": "staff"}, ttl="86400s")   # test data: 1 day (ADR-016)
     t0 = time.time()
     answer, searches, calls, tokens_in, tokens_out, errors = "", [], 0, 0, 0, []
     for ev in REMOTE.stream_query(user_id="eval", session_id=session["id"], message=question):

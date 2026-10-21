@@ -1,6 +1,7 @@
 """SMO-22 · sg-api: the only door to the agent for people (ADR-014).
 
     POST /chat  {"message": "...", "session_id": optional}   Authorization: Bearer <Identity Platform ID token>
+    GET  /sessions · GET /sessions/{id} · DELETE /sessions/{id}   the caller's own history, no LLM call (ADR-016)
     GET  /health
 
 1. Verify the ID token (Google public keys, issuer + audience = this project, expiry)         -> 401
@@ -33,6 +34,7 @@ AGENT = os.getenv("STOREGEAR_AGENT_RESOURCE", "projects/1066603052728/locations/
 AGENT_LOCATION = os.getenv("STOREGEAR_AGENT_LOCATION", "eu")
 INSTANCE = f"{PROJECT}:europe-west1:sg-catalog"
 DB_USER = os.getenv("STOREGEAR_API_DB_USER", f"sg-api@{PROJECT}.iam")
+SESSION_TTL = os.getenv("STOREGEAR_SESSION_TTL", f"{30 * 24 * 3600}s")   # 30 days, then the platform deletes it (ADR-016)
 PER_MIN, PER_DAY = int(os.getenv("STOREGEAR_RATE_PER_MIN", "20")), int(os.getenv("STOREGEAR_RATE_PER_DAY", "300"))
 ROLES = {"staff", "manager"}
 POOL = ThreadPoolExecutor(8)
@@ -137,7 +139,7 @@ def chat(body: Ask, who: dict = Depends(user)) -> dict:
         if (s.get("state") or {}).get("user:role") != who["role"]:
             sid = None   # the role changed since this session started: never reuse it
     if not sid:
-        sid = r.create_session(user_id=who["uid"], state={"user:role": who["role"]})["id"]
+        sid = r.create_session(user_id=who["uid"], state={"user:role": who["role"]}, ttl=SESSION_TTL)["id"]
     t0, answer, error = time.time(), [], None
     for ev in r.stream_query(user_id=who["uid"], session_id=sid, message=message):
         if ev.get("error_code"):
@@ -162,3 +164,38 @@ def chat(body: Ask, who: dict = Depends(user)) -> dict:
         return {"session_id": sid, "answer": REPLY["blocked"], "seconds": round(time.time() - t0, 1), "guard": {**guard, "blocked": "output", "filters": hits_out}}
     return {"session_id": sid, "answer": text, "seconds": round(time.time() - t0, 1),
             "guard": {**guard, "pii_out": pii_out, "links_removed": links}}
+
+
+# ---------------------------------------------------------------- history (ADR-016): no model call, own sessions only
+def _own(r, uid: str, sid: str) -> dict:
+    try:   # ADK refuses a session whose user_id isn't the caller's: another user's id looks exactly like a missing one
+        return r.get_session(user_id=uid, session_id=sid)
+    except Exception:  # noqa: BLE001
+        raise HTTPException(404, "session not found") from None
+
+
+@app.get("/sessions")
+def list_sessions(who: dict = Depends(user)) -> dict:
+    res = remote().list_sessions(user_id=who["uid"])
+    items = res.get("sessions", []) if isinstance(res, dict) else res
+    return {"sessions": sorted(({"session_id": x.get("id"), "last_update": x.get("last_update_time") or x.get("lastUpdateTime")}
+                                for x in items), key=lambda x: x["last_update"] or 0, reverse=True)}
+
+
+@app.get("/sessions/{sid}")
+def get_history(sid: str, who: dict = Depends(user)) -> dict:
+    s = _own(remote(), who["uid"], sid)
+    messages = []
+    for ev in s.get("events", []):
+        texts = [p["text"] for p in (ev.get("content") or {}).get("parts", []) or [] if p.get("text") and not p.get("thought")]
+        if texts:
+            messages.append({"role": "user" if ev.get("author") == "user" else "assistant", "text": texts[-1]})
+    return {"session_id": sid, "messages": messages}
+
+
+@app.delete("/sessions/{sid}")
+def delete_history(sid: str, who: dict = Depends(user)) -> dict:
+    r = remote()
+    _own(r, who["uid"], sid)
+    r.delete_session(user_id=who["uid"], session_id=sid)
+    return {"deleted": sid}

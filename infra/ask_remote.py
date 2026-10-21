@@ -20,7 +20,7 @@ STATE = json.loads((ROOT / "infra" / "agent_runtime.json").read_text())
 
 
 def ask(remote, question: str, role: str) -> float:
-    session = remote.create_session(user_id="remote-test", state={"user:role": role})
+    session = remote.create_session(user_id="remote-test", state={"user:role": role}, ttl="86400s")   # test data: 1 day (ADR-016)
     t0 = time.time()
     print(f"\n> [{role}] {question}")
     for ev in remote.stream_query(user_id="remote-test", session_id=session["id"], message=question):
