@@ -15,6 +15,7 @@ Baseline (n8n, 2026-10-11): Correctness 5.00 · Faithfulness 4.95 · Context 5.0
 import argparse
 import asyncio
 import json
+import os
 import statistics
 import sys
 import time
@@ -26,6 +27,25 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / "agent" / "storegear" / ".env")
 sys.path.insert(0, str(ROOT / "agent"))
+
+
+def mirror_deployed_search_config() -> None:
+    """--remote rebuilds the agent's retrieval context on this laptop for the judges. It must use the SAME search
+    settings as the deployed agent, or the judge sees fewer sections than the agent did and calls its answer
+    unfaithful (found 2026-10-21: agent on 7 sections, judge context on 5 -> faithfulness 4.5)."""
+    import google.auth
+    from google.auth.transport.requests import AuthorizedSession
+    st = json.loads((ROOT / "infra" / "agent_runtime.json").read_text())
+    creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    spec = AuthorizedSession(creds).get(f"https://aiplatform.eu.rep.googleapis.com/v1beta1/{st['resource_name']}", timeout=30).json()
+    for e in spec.get("spec", {}).get("deploymentSpec", {}).get("env", []):
+        if e.get("name") in ("STOREGEAR_RETURN_N", "STOREGEAR_CATALOG_SUFFIX"):
+            os.environ[e["name"]] = e.get("value", "")
+            print(f"mirroring deployed {e['name']}={e.get('value')}")
+
+
+if "--remote" in sys.argv:
+    mirror_deployed_search_config()   # before importing the agent: search reads its settings at import
 
 from google import genai  # noqa: E402
 from google.adk.runners import InMemoryRunner  # noqa: E402
