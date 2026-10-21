@@ -5,6 +5,7 @@ description = "StoreGear Assistant rebuilt on Gemini Enterprise Agent Platform w
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "cloud-sql-python-connector[pg8000]>=1.23.0",
+    "fastapi>=0.115",
     "google-adk>=2.0",
     "google-cloud-aiplatform[adk,agent-engines]>=1.112",
     "google-cloud-documentai>=3.16.0",
@@ -12,6 +13,7 @@ dependencies = [
     "numpy>=2.5.4",
     "pypdf>=6.21.1",
     "sqlalchemy>=2.1.5",
+    "uvicorn>=0.30",
 ]
 
 [tool.uv]

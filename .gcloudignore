@@ -7,3 +7,5 @@
 !uv.lock
 !ingestion/
 ingestion/__pycache__/
+!api/
+api/__pycache__/
