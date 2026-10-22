@@ -16,6 +16,7 @@ import threading
 import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor
+from typing import Literal
 
 import google.auth
 import google.auth.transport.requests
@@ -219,6 +220,29 @@ def compare(body: CompareAsk, who: dict = Depends(demo_user), store: CompareStor
         yield stream.sse("done", {"comparison_id": k, "votable": not (failed["A"] or failed["B"])})
 
     return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
+class VoteBody(BaseModel):
+    vote: Literal["A", "B", "tie"]
+
+
+@app.post("/compare/{comparison_id}/vote")
+def vote(comparison_id: str, body: VoteBody, who: dict = Depends(demo_user), store: CompareStore = Depends(get_store)) -> dict:
+    result = store.vote(comparison_id, who["uid"], body.vote)
+    if result == "not_found":
+        raise HTTPException(404, "comparison not found")
+    if result == "conflict":
+        raise HTTPException(409, "already voted, not votable or conversation closed")
+    return {"ok": True}
+
+
+@app.post("/conversations/{conversation_id}/reveal")
+def reveal(conversation_id: str, who: dict = Depends(demo_user), store: CompareStore = Depends(get_store)) -> dict:
+    """Ends the conversation: from now on no questions or votes, and the client learns which agent was which."""
+    out = store.reveal(conversation_id, who["uid"])
+    if out is None:
+        raise HTTPException(404, "conversation not found")
+    return out
 
 
 # ---------------------------------------------------------------- history (ADR-016): no model call, own sessions only
