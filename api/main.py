@@ -166,6 +166,32 @@ def catalog_models() -> dict:
     return {"models": _models_cache[1]}
 
 
+@app.post("/chat/stream")
+def chat_stream(body: Ask, who: dict = Depends(user)):
+    """/chat for the web app: the same flow, streamed as progress steps with their real times (spec §6.2)."""
+    rate_limit(who["uid"])
+    message, _ = guards.mask_pii(body.message)
+
+    def events():
+        t0 = time.monotonic()
+        end = None
+        try:
+            for e in agents.gcp_events(remote(), who["uid"], who["role"], message, body.session_id):
+                if e["type"] == "step":
+                    yield stream.sse("step", {k: e[k] for k in ("label", "status", "ms") if k in e})
+                else:
+                    end = e
+        except Exception:  # noqa: BLE001  Agent Runtime unreachable or broken mid-stream: the client gets the fixed text
+            end = None
+        total_ms = round((time.monotonic() - t0) * 1000)
+        if end and end["type"] == "answer":
+            yield stream.sse("answer", {"text": end["text"], "total_ms": total_ms, "session_id": end["session_id"]})
+        else:
+            yield stream.sse("error", {"message": stream.FAILED, "total_ms": total_ms})
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
 # ---------------------------------------------------------------- blind comparison for the web demo (ADR-017)
 RNG = random.SystemRandom()   # which agent is A, drawn once per conversation
 _store: CompareStore | None = None
