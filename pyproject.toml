@@ -25,3 +25,7 @@ package = false
 dev = [
     "pytest>=9.1.1",
 ]
+
+[tool.pytest.ini_options]
+# the plan fixes the test secret "test-secret" (11 bytes); production secrets are >= 32 bytes
+filterwarnings = ["ignore::jwt.warnings.InsecureKeyLengthWarning"]
