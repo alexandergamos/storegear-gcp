@@ -26,6 +26,7 @@ from google.cloud.sql.connector import Connector
 from google.oauth2 import id_token
 from pydantic import BaseModel, Field
 
+import catalog
 import guards
 
 warnings.filterwarnings("ignore")
@@ -181,6 +182,29 @@ def chat(body: Ask, who: dict = Depends(user)) -> dict:
         return {"session_id": sid, "answer": REPLY["blocked"], "seconds": round(time.time() - t0, 1), "guard": {**guard, "blocked": "output", "filters": hits_out}}
     return {"session_id": sid, "answer": text, "seconds": round(time.time() - t0, 1),
             "guard": {**guard, "pii_out": pii_out, "links_removed": links}}
+
+
+MODELS_TTL = 600   # seconds; the catalog changes when a manual is ingested, a few times a week at most
+_models_cache: tuple[float, list[str]] | None = None
+
+
+def staff_file_names() -> list[str]:
+    conn = db()
+    try:
+        cur = conn.cursor()
+        cur.execute("""SELECT DISTINCT file_name FROM catalog_chunks
+                       WHERE access_level = 'staff' AND file_id <> 'polar-common'""")
+        return [r[0] for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+@app.get("/catalog/models")   # public: the web demo's empty state lists the models before anyone signs in
+def catalog_models() -> dict:
+    global _models_cache
+    if _models_cache is None or time.time() - _models_cache[0] > MODELS_TTL:
+        _models_cache = (time.time(), catalog.list_models(staff_file_names))
+    return {"models": _models_cache[1]}
 
 
 @app.post("/compare")
