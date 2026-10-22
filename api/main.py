@@ -26,6 +26,7 @@ from google.cloud.sql.connector import Connector
 from google.oauth2 import id_token
 from pydantic import BaseModel, Field
 
+import agents
 import catalog
 import guards
 
@@ -35,15 +36,10 @@ AGENT = os.getenv("STOREGEAR_AGENT_RESOURCE", "projects/1066603052728/locations/
 AGENT_LOCATION = os.getenv("STOREGEAR_AGENT_LOCATION", "eu")
 INSTANCE = f"{PROJECT}:europe-west1:sg-catalog"
 DB_USER = os.getenv("STOREGEAR_API_DB_USER", f"sg-api@{PROJECT}.iam")
-SESSION_TTL = os.getenv("STOREGEAR_SESSION_TTL", f"{30 * 24 * 3600}s")   # 30 days, then the platform deletes it (ADR-016)
 PER_MIN, PER_DAY = int(os.getenv("STOREGEAR_RATE_PER_MIN", "20")), int(os.getenv("STOREGEAR_RATE_PER_DAY", "300"))
 ROLES = {"staff", "manager"}
 POOL = ThreadPoolExecutor(8)
-REPLY = {   # what the employee sees when a guardrail stops a request (ADR-015)
-    "blocked": "Lo siento, no puedo ayudar con esa petición. Puedo responder sobre los relojes del catálogo, su precio y stock, y las políticas de la tienda.",
-    "off_topic": "Solo puedo ayudarte con los relojes del catálogo (especificaciones, uso, precio y stock) y con las políticas de la tienda. ¿Qué necesitas saber?",
-    "leak": "No puedo compartir detalles internos sobre cómo funciono. ¿En qué te ayudo con el catálogo?",
-}
+REPLY = agents.REPLY
 
 app = FastAPI(title="StoreGear API", docs_url=None, redoc_url=None, openapi_url=None)   # no public API map
 app.add_middleware(CORSMiddleware, allow_origins=[o for o in os.getenv("STOREGEAR_ALLOWED_ORIGINS", "").split(",") if o],
@@ -132,56 +128,15 @@ def chat(body: Ask, who: dict = Depends(user)) -> dict:
     rate_limit(who["uid"])
     # INPUT (ADR-015): PII masked first, so nothing downstream (Model Armor, the model, the session, logs) sees it
     message, pii_in = guards.mask_pii(body.message)
-    guard = {"pii_in": pii_in}
-    # Model Armor FIRST, the topic check (a Gemini call) only if the text is clean: content Model Armor blocks must
-    # never reach the model, not even for classification.
-    try:
-        hits = guards.armor(message)
-    except Exception:  # noqa: BLE001  fail closed: an unchecked question never reaches the agent
-        raise HTTPException(503, "guardrail unavailable") from None
-    if hits:
-        return {"session_id": body.session_id, "answer": REPLY["blocked"], "guard": {**guard, "blocked": "input", "filters": hits}}
-    try:
-        topic_ok = guards.on_topic(message)
-    except Exception:  # noqa: BLE001
-        raise HTTPException(503, "guardrail unavailable") from None
-    if not topic_ok:
-        return {"session_id": body.session_id, "answer": REPLY["off_topic"], "guard": {**guard, "blocked": "off_topic"}}
-    r = remote()
-    sid = body.session_id
-    if sid:
-        try:
-            s = r.get_session(user_id=who["uid"], session_id=sid)   # only the owner's sessions are found
-        except Exception:  # noqa: BLE001
-            raise HTTPException(404, "session not found") from None
-        if (s.get("state") or {}).get("user:role") != who["role"]:
-            sid = None   # the role changed since this session started: never reuse it
-    if not sid:
-        sid = r.create_session(user_id=who["uid"], state={"user:role": who["role"]}, ttl=SESSION_TTL)["id"]
-    t0, answer, error = time.time(), [], None
-    for ev in r.stream_query(user_id=who["uid"], session_id=sid, message=message):
-        if ev.get("error_code"):
-            error = ev["error_code"]
-        for p in (ev.get("content") or {}).get("parts", []) or []:
-            if p.get("text") and not p.get("thought") and ev.get("author") != "user":
-                answer.append(p["text"])
-    if not answer:
-        raise HTTPException(502, f"agent error: {error or 'empty answer'}")
-    # OUTPUT: leaks of how we're built, links outside the brands, PII, and Model Armor's harm filters
-    text = answer[-1]
-    found_leak = guards.leak(text)
-    if found_leak:
-        return {"session_id": sid, "answer": REPLY["leak"], "seconds": round(time.time() - t0, 1), "guard": {**guard, "blocked": "leak", "leak": found_leak}}
-    text, links = guards.strip_links(text)
-    text, pii_out = guards.mask_pii(text)
-    try:
-        hits_out = guards.armor(text, response=True)
-    except Exception:  # noqa: BLE001
-        raise HTTPException(503, "guardrail unavailable") from None
-    if hits_out:
-        return {"session_id": sid, "answer": REPLY["blocked"], "seconds": round(time.time() - t0, 1), "guard": {**guard, "blocked": "output", "filters": hits_out}}
-    return {"session_id": sid, "answer": text, "seconds": round(time.time() - t0, 1),
-            "guard": {**guard, "pii_out": pii_out, "links_removed": links}}
+    end = None
+    for end in agents.gcp_events(remote(), who["uid"], who["role"], message, body.session_id):
+        pass
+    if end["type"] == "error":
+        raise HTTPException(end["status"], end["message"])
+    out = {"session_id": end["session_id"], "answer": end["text"]}
+    if "seconds" in end:
+        out["seconds"] = end["seconds"]
+    return {**out, "guard": {"pii_in": pii_in, **end["guard"]}}
 
 
 MODELS_TTL = 600   # seconds; the catalog changes when a manual is ingested, a few times a week at most
