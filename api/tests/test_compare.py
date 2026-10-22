@@ -131,3 +131,52 @@ def test_comparison_row_has_both_totals(setup):
     assert isinstance(row["a_total_ms"], int) and isinstance(row["b_total_ms"], int)
     assert (row["a_error"], row["b_error"]) == (False, False)
     assert row["question"] == "¿Cuánto pesa el Venu X1?"
+
+
+def labels_by_slot(out):
+    seq = {"A": [], "B": []}
+    for e, d in out:
+        if e == "step":
+            seq[d["slot"]].append((d["label"], d["status"]))
+    return seq
+
+
+SAME_STEPS = [("Pregunta revisada", "running"), ("Pregunta revisada", "done"),
+              ("Buscando en los manuales", "running"), ("Buscando en los manuales", "done"),
+              ("Redactando la respuesta", "running"), ("Redactando la respuesta", "done")]
+
+
+def test_price_question_steps_do_not_unblind(setup, monkeypatch):
+    from fakes import PRICE_EVENTS
+    monkeypatch.setattr(setup.remote, "events", PRICE_EVENTS)
+    seq = labels_by_slot(events(setup.post()))
+    assert seq["A"] == seq["B"] == SAME_STEPS
+
+
+def test_guard_block_steps_do_not_unblind(setup, monkeypatch):
+    import guards
+    monkeypatch.setattr(guards, "on_topic", lambda text: False)
+    seq = labels_by_slot(events(setup.post()))
+    assert seq["A"] == seq["B"] == SAME_STEPS
+
+
+def test_agent_failures_are_logged_without_the_question(setup, monkeypatch, caplog):
+    import json as _json
+    import logging
+
+    def down(*a, **k):
+        raise agents.AgentError("n8n status 401")
+    monkeypatch.setattr(agents, "ask_n8n", down)
+
+    def unreachable():
+        raise RuntimeError("403 Forbidden")
+    monkeypatch.setattr(main, "remote", unreachable)
+    with caplog.at_level(logging.WARNING, logger="sg-api"):
+        cid = events(setup.post())[0][1]["conversation_id"]
+    records = [_json.loads(r.getMessage()) for r in caplog.records if r.name == "sg-api"]
+    by_agent = {r["agent"]: r for r in records}
+    assert set(by_agent) == {"gcp", "n8n"}
+    assert by_agent["n8n"]["reason"] == "AgentError: n8n status 401"
+    assert by_agent["gcp"]["reason"] == "RuntimeError: 403 Forbidden"
+    assert all(r["event"] == "AGENT_FAILED" and r["conversation_id"] == cid and r["uid"] == "u1" for r in records)
+    assert "Venu" not in caplog.text   # the question never goes to the logs

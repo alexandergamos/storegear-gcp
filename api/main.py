@@ -10,6 +10,8 @@
 4. Call Agent Runtime AS sg-api: session user_id = uid, state user:role = role FROM THE TOKEN.
    The request body can't carry a role; a session created with another role is never reused.
 """
+import json
+import logging
 import os
 import random
 import threading
@@ -44,6 +46,7 @@ PER_MIN, PER_DAY = int(os.getenv("STOREGEAR_RATE_PER_MIN", "20")), int(os.getenv
 ROLES = {"staff", "manager"}
 POOL = ThreadPoolExecutor(8)
 REPLY = agents.REPLY
+log = logging.getLogger("sg-api")   # WARNING lines go to stderr as JSON; Cloud Logging reads them as structured entries
 
 app = FastAPI(title="StoreGear API", docs_url=None, redoc_url=None, openapi_url=None)   # no public API map
 app.add_middleware(CORSMiddleware, allow_origins=[o for o in os.getenv("STOREGEAR_ALLOWED_ORIGINS", "").split(",") if o],
@@ -133,7 +136,7 @@ def chat(body: Ask, who: dict = Depends(user)) -> dict:
     # INPUT (ADR-015): PII masked first, so nothing downstream (Model Armor, the model, the session, logs) sees it
     message, pii_in = guards.mask_pii(body.message)
     end = None
-    for end in agents.gcp_events(remote(), who["uid"], who["role"], message, body.session_id):
+    for end in agents.gcp_events(remote, who["uid"], who["role"], message, body.session_id):
         pass
     if end["type"] == "error":
         raise HTTPException(end["status"], end["message"])
@@ -166,6 +169,24 @@ def catalog_models() -> dict:
     return {"models": _models_cache[1]}
 
 
+def log_failure(agent: str, uid: str, conversation_id: str | None, reason: str) -> None:
+    """Why an agent failed, for us; the client only ever sees the fixed text. Never the question or a token."""
+    log.warning(json.dumps({"severity": "WARNING", "event": "AGENT_FAILED", "agent": agent, "uid": uid,
+                            "conversation_id": conversation_id, "reason": reason[:300]}, ensure_ascii=False))
+
+
+def watched(agent: str, events, uid: str, conversation_id: str | None):
+    """Passes an agent's events through, logging its error terminal or exception (then re-raising it)."""
+    try:
+        for e in events:
+            if e["type"] == "error":
+                log_failure(agent, uid, conversation_id, e["message"])
+            yield e
+    except Exception as ex:
+        log_failure(agent, uid, conversation_id, f"{type(ex).__name__}: {ex}")
+        raise
+
+
 @app.post("/chat/stream")
 def chat_stream(body: Ask, who: dict = Depends(user)):
     """/chat for the web app: the same flow, streamed as progress steps with their real times (spec §6.2)."""
@@ -176,7 +197,7 @@ def chat_stream(body: Ask, who: dict = Depends(user)):
         t0 = time.monotonic()
         end = None
         try:
-            for e in agents.gcp_events(remote(), who["uid"], who["role"], message, body.session_id):
+            for e in watched("gcp", agents.gcp_events(remote, who["uid"], who["role"], message, body.session_id), who["uid"], None):
                 if e["type"] == "step":
                     yield stream.sse("step", {k: e[k] for k in ("label", "status", "ms") if k in e})
                 else:
@@ -219,10 +240,10 @@ def compare(body: CompareAsk, who: dict = Depends(demo_user), store: CompareStor
     if not conv:
         conv = store.get_conversation(store.create_conversation(who["uid"], RNG.choice(["gcp", "n8n"])), who["uid"])
 
-    def gcp():   # lazy, inside the slot's thread: if Agent Runtime is unreachable, only this slot fails
-        yield from agents.gcp_events(remote(), who["uid"], who["role"], message, conv.gcp_session_id)
-
-    by_agent = {"gcp": gcp(), "n8n": stream.n8n_events(lambda: agents.ask_n8n(message, who["uid"], conv.id))}
+    # remote() runs inside the slot's thread, after the guards: if Agent Runtime is unreachable, only this slot fails
+    gcp = agents.gcp_events(remote, who["uid"], who["role"], message, conv.gcp_session_id)
+    n8n = stream.n8n_events(lambda: agents.ask_n8n(message, who["uid"], conv.id))
+    by_agent = {"gcp": watched("gcp", gcp, who["uid"], conv.id), "n8n": watched("n8n", n8n, who["uid"], conv.id)}
     gcp_slot = "A" if conv.mapping_a == "gcp" else "B"
 
     def events():

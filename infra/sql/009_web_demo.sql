@@ -1,8 +1,10 @@
 -- 009_web_demo.sql · SMO-35 · sg-api for the web demo (ADR-017)
 --   uv run python infra/sql/apply.py infra/sql/009_web_demo.sql
 
--- GET /catalog/models: model names from the staff manuals (file names only, never chunk text to the client)
-GRANT SELECT ON catalog_chunks TO "sg-api@storegear-prod-ag26.iam";
+-- GET /catalog/models: model names from the staff manuals. Column grant: the internet-facing sg-api can't read
+-- chunk text (manager manuals are reached only through the agent, with the role from the token).
+-- A catalog swap by rename (003, 007) creates a new table without this grant: re-run this line after a swap.
+GRANT SELECT (file_name, access_level, file_id) ON catalog_chunks TO "sg-api@storegear-prod-ag26.iam";
 
 -- Blind comparisons: which agent is A in each conversation (never sent before reveal) and one vote per question.
 -- Deleted once the SMO-29 report is written (runbook).

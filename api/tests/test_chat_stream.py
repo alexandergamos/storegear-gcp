@@ -68,3 +68,13 @@ def test_unreachable_google_is_an_error_event(client, as_user, no_rate_limit, cl
         raise RuntimeError("403 Forbidden")
     monkeypatch.setattr(main, "remote", blocked)
     assert parse_sse(post(client).text)[-1][0] == "error"
+
+
+def test_failures_are_logged(client, as_user, no_rate_limit, clean_guards, monkeypatch, caplog):
+    import logging
+    as_user()
+    monkeypatch.setattr(main, "remote", lambda: FakeRemote([ev(error_code="UNAVAILABLE")]))
+    with caplog.at_level(logging.WARNING, logger="sg-api"):
+        post(client)
+    assert '"AGENT_FAILED"' in caplog.text and "agent error: UNAVAILABLE" in caplog.text
+    assert "Venu" not in caplog.text

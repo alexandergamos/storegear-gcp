@@ -83,7 +83,7 @@ def test_sse_round_trips_spanish():
 
 def test_n8n_events_schedule():
     waits = []
-    out = list(stream.n8n_events(lambda: "ok", clock=lambda: 0.0,
+    out = list(stream.n8n_events(lambda: "ok", clock=lambda: 0.0, schedule=[("Pregunta revisada", 1.0), ("Buscando en los manuales", 3.0)],
                                  wait=lambda ev, t: waits.append(round(t, 2)) and False))
     steps = [(e["label"], e["status"]) for e in out if e["type"] == "step"]
     assert steps == [("Pregunta revisada", "running"), ("Pregunta revisada", "done"),
@@ -104,3 +104,10 @@ def test_n8n_events_failure():
 def test_n8n_fast_answer_is_not_held_back():
     out = list(stream.n8n_events(lambda: "rápida"))   # real wait: returns as soon as the answer is there
     assert out[-1] == {"type": "answer", "text": "rápida"}
+
+
+def test_n8n_default_schedule_is_jittered():
+    for _ in range(20):
+        (l1, t1), (l2, t2) = stream.n8n_schedule()
+        assert (l1, l2) == ("Pregunta revisada", "Buscando en los manuales")
+        assert 0.6 <= t1 <= 1.4 and 2.2 <= t2 <= 3.8

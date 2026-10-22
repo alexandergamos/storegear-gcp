@@ -20,7 +20,7 @@ Constraints: role and identity come only from the verified login (ADR-014). PII 
 ## Decision
 **A.** New endpoints in `sg-api`:
 - `GET /catalog/models` (public): display names of the staff manuals.
-- `POST /compare` (demo only, SSE): both agents in parallel. A/B is drawn once per conversation and kept in Cloud SQL (`compare_conversations`). Steps carry no per-step time (n8n's would be invented and would give the blind away); each column has a real total.
+- `POST /compare` (demo only, SSE): both agents in parallel. A/B is drawn once per conversation and kept in Cloud SQL (`compare_conversations`). Steps carry no per-step time (n8n's would be invented and would give the blind away), and both columns always show the **same three steps** (Pregunta revisada → Buscando en los manuales → Redactando la respuesta): the real "Consultando precio y stock" step, or a guard block's one-step list, would tell the agents apart. n8n's simulated steps finish at jittered times (0.6–1.4 s, 2.2–3.8 s). Each column has a real total.
 - `POST /compare/{id}/vote`: one vote per question, never when a slot failed or after the reveal.
 - `POST /conversations/{id}/reveal`: ends the conversation and returns the mapping.
 - `POST /chat/stream`: the Google Cloud agent alone, with real per-step times. `/chat` keeps its JSON contract.
@@ -29,7 +29,9 @@ Constraints: role and identity come only from the verified login (ADR-014). PII 
 
 **Steps (Google Cloud):** fixed labels that only move forward: Pregunta revisada (guardrails) → Buscando en los manuales (from the start of the agent call; the agent searches before its first model call) → Consultando precio y stock (only if called) → Redactando la respuesta. Without partial events the final text arrives in one event, so drafting time is counted under search. Partial events can be turned on (`STOREGEAR_PARTIAL_EVENTS=1`) after a live check.
 
-**Failure:** each slot fails on its own, with a fixed text ("Este agente no ha podido responder ahora.") and a 150 s deadline; if Agent Runtime is unreachable, only its column fails.
+**Failure:** each slot fails on its own, with a fixed text ("Este agente no ha podido responder ahora.") and a 150 s deadline; if Agent Runtime is unreachable, only its column fails, and a guard-blocked question never needs it. Every failure is logged server-side as a JSON `AGENT_FAILED` line (agent, uid, conversation id, reason; never the question or a token).
+
+**Data access:** `sg-api` gets a column grant on `catalog_chunks` (file name, access level, file id), not the chunk text.
 
 ## Consequences
 - **Good:** the blind holds at the network level; the n8n secret never leaves the server; one rate limit and one PII mask for both agents. The votes and the real totals feed the SMO-29 comparison.

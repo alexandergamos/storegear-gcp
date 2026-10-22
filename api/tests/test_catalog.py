@@ -65,3 +65,11 @@ def test_models_are_cached(client, monkeypatch):
     client.get("/catalog/models")
     client.get("/catalog/models")
     assert len(calls) == 1
+
+
+def test_sg_api_reads_only_the_columns_it_needs():
+    # sg-api is internet-facing: it may read file names and access levels, never chunk text (manager manuals included)
+    import pathlib
+    sql = (pathlib.Path(__file__).parents[2] / "infra" / "sql" / "009_web_demo.sql").read_text(encoding="utf-8")
+    grants = [line for line in sql.splitlines() if line.startswith("GRANT") and "catalog_chunks" in line]
+    assert grants == ['GRANT SELECT (file_name, access_level, file_id) ON catalog_chunks TO "sg-api@storegear-prod-ag26.iam";']

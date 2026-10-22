@@ -7,7 +7,7 @@ Google Cloud: the Agent Runtime agent behind sg-api's guardrails (ADR-015), as a
 """
 import os
 import time
-from typing import Iterator
+from typing import Callable, Iterator
 
 import httpx
 import jwt
@@ -86,10 +86,12 @@ def _error(status: int, message: str) -> dict:
     return {"type": "error", "status": status, "message": message}
 
 
-def gcp_events(remote, uid: str, role: str, message: str, session_id: str | None, clock=time.monotonic) -> Iterator[dict]:
+def gcp_events(get_remote: Callable, uid: str, role: str, message: str, session_id: str | None,
+               clock=time.monotonic) -> Iterator[dict]:
     """Steps, then exactly one terminal: answer {text, session_id, guard[, seconds]} or error {status, message}.
 
     `message` is already PII-masked by the caller. A guardrail block is a normal answer (the guard's reply).
+    `get_remote` is only called once the input guards pass: a blocked question never needs Agent Runtime.
     """
     steps = _Steps(clock)
     yield from steps.start(CHECK)
@@ -113,6 +115,7 @@ def gcp_events(remote, uid: str, role: str, message: str, session_id: str | None
         yield from steps.finish()
         yield {"type": "answer", "text": REPLY["off_topic"], "session_id": session_id, "guard": {"blocked": "off_topic"}}
         return
+    remote = get_remote()
     sid = session_id
     if sid:
         try:
