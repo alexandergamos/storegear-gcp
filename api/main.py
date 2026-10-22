@@ -119,14 +119,19 @@ def chat(body: Ask, who: dict = Depends(user)) -> dict:
     rate_limit(who["uid"])
     # INPUT (ADR-015): PII masked first, so nothing downstream (Model Armor, the model, the session, logs) sees it
     message, pii_in = guards.mask_pii(body.message)
-    f_armor, f_topic = POOL.submit(guards.armor, message), POOL.submit(guards.on_topic, message)
+    guard = {"pii_in": pii_in}
+    # Model Armor FIRST, the topic check (a Gemini call) only if the text is clean: content Model Armor blocks must
+    # never reach the model, not even for classification.
     try:
-        hits, topic_ok = f_armor.result(), f_topic.result()
+        hits = guards.armor(message)
     except Exception:  # noqa: BLE001  fail closed: an unchecked question never reaches the agent
         raise HTTPException(503, "guardrail unavailable") from None
-    guard = {"pii_in": pii_in}
     if hits:
         return {"session_id": body.session_id, "answer": REPLY["blocked"], "guard": {**guard, "blocked": "input", "filters": hits}}
+    try:
+        topic_ok = guards.on_topic(message)
+    except Exception:  # noqa: BLE001
+        raise HTTPException(503, "guardrail unavailable") from None
     if not topic_ok:
         return {"session_id": body.session_id, "answer": REPLY["off_topic"], "guard": {**guard, "blocked": "off_topic"}}
     r = remote()
