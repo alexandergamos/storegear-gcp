@@ -10,7 +10,9 @@ dependencies = [
     "google-cloud-aiplatform[adk,agent-engines]>=1.112",
     "google-cloud-documentai>=3.16.0",
     "google-cloud-secret-manager>=2.31.0",
+    "httpx>=0.28.1",
     "numpy>=2.5.4",
+    "pyjwt>=2.15.1",
     "pypdf>=6.21.1",
     "sqlalchemy>=2.1.5",
     "uvicorn>=0.30",
@@ -20,4 +22,6 @@ dependencies = [
 package = false
 
 [dependency-groups]
-dev = []
+dev = [
+    "pytest>=9.1.1",
+]

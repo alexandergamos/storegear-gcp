@@ -83,7 +83,8 @@ def user(authorization: str = Header(default="")) -> dict:
         raise HTTPException(401, "invalid token") from None
     if not claims or claims.get("role") not in ROLES:
         raise HTTPException(403, "no role assigned")
-    return {"uid": claims["sub"], "role": claims["role"]}
+    # demo accounts (jury) see the blind comparison; only a literal JSON true counts
+    return {"uid": claims["sub"], "role": claims["role"], "demo": claims.get("demo") is True}
 
 
 def rate_limit(uid: str) -> None:
@@ -107,6 +108,17 @@ def rate_limit(uid: str) -> None:
 class Ask(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     session_id: str | None = None
+
+
+class CompareAsk(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+    conversation_id: str | None = None
+
+
+def demo_user(who: dict = Depends(user)) -> dict:
+    if not who["demo"]:
+        raise HTTPException(403, "demo only")
+    return who
 
 
 @app.get("/health")   # not /healthz: Cloud Run's front end reserves paths ending in "z"
@@ -169,6 +181,11 @@ def chat(body: Ask, who: dict = Depends(user)) -> dict:
         return {"session_id": sid, "answer": REPLY["blocked"], "seconds": round(time.time() - t0, 1), "guard": {**guard, "blocked": "output", "filters": hits_out}}
     return {"session_id": sid, "answer": text, "seconds": round(time.time() - t0, 1),
             "guard": {**guard, "pii_out": pii_out, "links_removed": links}}
+
+
+@app.post("/compare")
+def compare(body: CompareAsk, who: dict = Depends(demo_user)):
+    raise HTTPException(501, "not implemented")
 
 
 # ---------------------------------------------------------------- history (ADR-016): no model call, own sessions only
