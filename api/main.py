@@ -22,6 +22,7 @@ import google.auth.transport.requests
 import vertexai
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from google.cloud.sql.connector import Connector
 from google.oauth2 import id_token
 from pydantic import BaseModel, Field
@@ -29,6 +30,8 @@ from pydantic import BaseModel, Field
 import agents
 import catalog
 import guards
+import stream
+from store import CompareStore, PgStore, other
 
 warnings.filterwarnings("ignore")
 PROJECT = os.getenv("STOREGEAR_PROJECT_ID", "storegear-prod-ag26")
@@ -162,9 +165,60 @@ def catalog_models() -> dict:
     return {"models": _models_cache[1]}
 
 
+# ---------------------------------------------------------------- blind comparison for the web demo (ADR-017)
+RNG = random.SystemRandom()   # which agent is A, drawn once per conversation
+_store: CompareStore | None = None
+
+
+def get_store() -> CompareStore:
+    global _store
+    if _store is None:
+        _store = PgStore(db)
+    return _store
+
+
 @app.post("/compare")
-def compare(body: CompareAsk, who: dict = Depends(demo_user)):
-    raise HTTPException(501, "not implemented")
+def compare(body: CompareAsk, who: dict = Depends(demo_user), store: CompareStore = Depends(get_store)):
+    """Both agents at once, blind: slots A/B only; the mapping stays here until /conversations/{id}/reveal."""
+    rate_limit(who["uid"])   # one compare = one request, although it asks two agents
+    conv = None
+    if body.conversation_id:
+        conv = store.get_conversation(body.conversation_id, who["uid"])
+        if not conv:
+            raise HTTPException(404, "conversation not found")   # another user's id looks like a missing one
+        if conv.revealed:
+            raise HTTPException(409, "conversation closed")
+    message, _ = guards.mask_pii(body.message)   # before EITHER agent sees it
+    if not conv:
+        conv = store.get_conversation(store.create_conversation(who["uid"], RNG.choice(["gcp", "n8n"])), who["uid"])
+
+    def gcp():   # lazy, inside the slot's thread: if Agent Runtime is unreachable, only this slot fails
+        yield from agents.gcp_events(remote(), who["uid"], who["role"], message, conv.gcp_session_id)
+
+    by_agent = {"gcp": gcp(), "n8n": stream.n8n_events(lambda: agents.ask_n8n(message, who["uid"], conv.id))}
+    gcp_slot = "A" if conv.mapping_a == "gcp" else "B"
+
+    def events():
+        yield stream.sse("conversation", {"conversation_id": conv.id})
+        totals, failed = {"A": None, "B": None}, {"A": False, "B": False}
+        for e in stream.merge_blind({"A": by_agent[conv.mapping_a], "B": by_agent[other(conv.mapping_a)]}):
+            slot = e["slot"]
+            if e["type"] == "step":
+                yield stream.sse("step", {"slot": slot, "label": e["label"], "status": e["status"]})
+                continue
+            totals[slot] = e["total_ms"]
+            if e["type"] == "answer":
+                sid = e.get("session_id")
+                if slot == gcp_slot and sid and sid != conv.gcp_session_id:
+                    store.set_gcp_session(conv.id, sid)
+                yield stream.sse("answer", {"slot": slot, "text": e["text"], "total_ms": e["total_ms"]})
+            else:
+                failed[slot] = True
+                yield stream.sse("error", {"slot": slot, "message": e["message"], "total_ms": e["total_ms"]})
+        k = store.add_comparison(conv.id, who["uid"], message, totals["A"], totals["B"], failed["A"], failed["B"])
+        yield stream.sse("done", {"comparison_id": k, "votable": not (failed["A"] or failed["B"])})
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
 # ---------------------------------------------------------------- history (ADR-016): no model call, own sessions only

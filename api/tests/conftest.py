@@ -7,6 +7,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("STOREGEAR_N8N_JWT_SECRET", "test-secret")
 
+import guards  # noqa: E402
 import main  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -34,3 +35,10 @@ def no_rate_limit(monkeypatch):
     calls: list[str] = []
     monkeypatch.setattr(main, "rate_limit", calls.append)
     return calls
+
+
+@pytest.fixture
+def clean_guards(monkeypatch):
+    """Model Armor and the topic check pass everything (both are Google calls)."""
+    monkeypatch.setattr(guards, "armor", lambda text, response=False: [])
+    monkeypatch.setattr(guards, "on_topic", lambda text: True)
