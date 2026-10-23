@@ -16,6 +16,7 @@ import os
 import random
 import threading
 import time
+import uuid
 import warnings
 from concurrent.futures import ThreadPoolExecutor
 from typing import Literal
@@ -42,6 +43,8 @@ AGENT = os.getenv("STOREGEAR_AGENT_RESOURCE", "projects/1066603052728/locations/
 AGENT_LOCATION = os.getenv("STOREGEAR_AGENT_LOCATION", "eu")
 INSTANCE = f"{PROJECT}:europe-west1:sg-catalog"
 DB_USER = os.getenv("STOREGEAR_API_DB_USER", f"sg-api@{PROJECT}.iam")
+# honest mode (2026-10-23): while Google restricts Agent Platform, the web demo talks to n8n alone, by name
+GCP_STATUS = os.getenv("STOREGEAR_GCP_STATUS", "ok")   # "ok" | "restricted"
 PER_MIN, PER_DAY = int(os.getenv("STOREGEAR_RATE_PER_MIN", "20")), int(os.getenv("STOREGEAR_RATE_PER_DAY", "300"))
 ROLES = {"staff", "manager"}
 POOL = ThreadPoolExecutor(8)
@@ -207,6 +210,38 @@ def chat_stream(body: Ask, who: dict = Depends(user)):
         total_ms = round((time.monotonic() - t0) * 1000)
         if end and end["type"] == "answer":
             yield stream.sse("answer", {"text": end["text"], "total_ms": total_ms, "session_id": end["session_id"]})
+        else:
+            yield stream.sse("error", {"message": stream.FAILED, "total_ms": total_ms})
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/status")   # public: the web app reads it to choose comparison or honest mode
+def status() -> dict:
+    return {"gcp": GCP_STATUS}
+
+
+@app.post("/n8n/stream")
+def n8n_stream(body: Ask, who: dict = Depends(user)):
+    """Honest mode only: the n8n agent alone, by name. Its steps are simulated, so they carry no per-step time."""
+    if GCP_STATUS != "restricted":
+        raise HTTPException(404, "not available")
+    rate_limit(who["uid"])
+    message, _ = guards.mask_pii(body.message)
+    conversation_id = (body.session_id or uuid.uuid4().hex)[:100]   # n8n keys its memory by this id
+
+    def events():
+        t0 = time.monotonic()
+        end = None
+        n8n = stream.n8n_events(lambda: agents.ask_n8n(message, who["uid"], conversation_id))
+        for e in watched("n8n", n8n, who["uid"], conversation_id):
+            if e["type"] == "step":
+                yield stream.sse("step", {"label": e["label"], "status": e["status"]})
+            else:
+                end = e
+        total_ms = round((time.monotonic() - t0) * 1000)
+        if end and end["type"] == "answer":
+            yield stream.sse("answer", {"text": end["text"], "total_ms": total_ms, "session_id": conversation_id})
         else:
             yield stream.sse("error", {"message": stream.FAILED, "total_ms": total_ms})
 
