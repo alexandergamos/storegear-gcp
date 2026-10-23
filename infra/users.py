@@ -3,6 +3,7 @@
     uv run python infra/users.py add ana@tienda.es staff          # creates the user; prints nothing secret
     uv run python infra/users.py add jurado1@ejemplo.es staff --demo  # jury account: sees the blind comparison (ADR-017)
     uv run python infra/users.py demo jurado1@ejemplo.es off       # turns the comparison off, keeps the role
+    uv run python infra/users.py jury jurado@storegear-gcp.test    # the jury's demo account; password to agent/storegear/.env
     uv run python infra/users.py role ana@tienda.es manager        # changes the role (takes effect at next token refresh, <= 1 h)
     uv run python infra/users.py role ana@tienda.es none           # removes the role -> sg-api answers 403
     uv run python infra/users.py disable ana@tienda.es
@@ -105,6 +106,11 @@ def main(args: list[str]) -> None:
         uid = uid_of(s, args[1]) or sys.exit(f"{args[1]}: not found")
         call(s, ":update", {"localId": uid, "disableUser": True})
         print(f"{args[1]}: disabled")
+    elif cmd == "jury":
+        # separate from test-demo: the test run regenerates test passwords, this one must stay as handed over
+        _, pw = add(s, args[1], "staff", demo=True)
+        write_env({"STOREGEAR_JURY_EMAIL": args[1], "STOREGEAR_JURY_PASSWORD": pw})
+        print(f"{args[1]}: role staff + demo; credentials written to {ENV.relative_to(ENV.parents[2])} (git-ignored)")
     elif cmd == "test-users":
         values = {}
         for kind, role, demo in (("STAFF", "staff", False), ("MANAGER", "manager", False), ("NOROLE", "none", False),

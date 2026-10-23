@@ -25,3 +25,13 @@ def test_current_claims_reads_custom_attributes(monkeypatch):
     assert users.current_claims(None, "a@b.c") == ("u1", "none", False)
     monkeypatch.setattr(users, "call", lambda s, path, body: {})
     assert users.current_claims(None, "a@b.c") is None
+
+
+def test_jury_command_creates_a_demo_staff_account_and_keeps_the_password_local(monkeypatch):
+    calls, written = [], {}
+    monkeypatch.setattr(users, "session", lambda: "s")
+    monkeypatch.setattr(users, "add", lambda s, email, role, password=None, demo=False: calls.append((email, role, demo)) or ("uid1", "pw-123"))
+    monkeypatch.setattr(users, "write_env", written.update)
+    users.main(["jury", "jurado@storegear-gcp.test"])
+    assert calls == [("jurado@storegear-gcp.test", "staff", True)]
+    assert written == {"STOREGEAR_JURY_EMAIL": "jurado@storegear-gcp.test", "STOREGEAR_JURY_PASSWORD": "pw-123"}
