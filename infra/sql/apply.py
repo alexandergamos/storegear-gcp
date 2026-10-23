@@ -6,7 +6,10 @@ How it connects (ADR-002 / ADR-004):
 - The Cloud SQL Python Connector opens an encrypted tunnel authorised by your Google login (ADC),
   so the instance needs no authorized networks.
 - The admin password is read from Secret Manager at run time and never printed or written to disk.
+- `{{ADMIN_EMAIL}}` in a SQL file is replaced by STOREGEAR_ADMIN_EMAIL (agent/storegear/.env), so no personal
+  email lives in the repo:  uv run --env-file agent/storegear/.env python infra/sql/apply.py <file>
 """
+import os
 import sys
 
 from google.cloud import secretmanager
@@ -23,6 +26,15 @@ def admin_password() -> str:
     return client.access_secret_version(name=name).payload.data.decode("utf-8")
 
 
+def render(sql: str, env=os.environ) -> str:
+    if "{{ADMIN_EMAIL}}" not in sql:
+        return sql
+    email = env.get("STOREGEAR_ADMIN_EMAIL")
+    if not email:
+        sys.exit("STOREGEAR_ADMIN_EMAIL is not set (run with --env-file agent/storegear/.env)")
+    return sql.replace("{{ADMIN_EMAIL}}", email)
+
+
 def split_statements(sql: str) -> list[str]:
     """Split on ';' at line ends, ignoring comment lines. Enough for our DDL files (no functions/DO blocks)."""
     # drop whole-line comments and trailing "-- ..." comments (our DDL has no '--' inside strings)
@@ -31,7 +43,7 @@ def split_statements(sql: str) -> list[str]:
 
 
 def main(path: str) -> None:
-    sql = open(path, encoding="utf-8").read()
+    sql = render(open(path, encoding="utf-8").read())
     with Connector() as connector:
         conn = connector.connect(INSTANCE, "pg8000", user="postgres", password=admin_password(), db=DATABASE)
         try:
