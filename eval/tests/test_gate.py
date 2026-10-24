@@ -64,6 +64,25 @@ def test_retry_list_command_prints_the_qids(tmp_path, capsys):
     assert capsys.readouterr().out.strip() == "4 7"
 
 
+def test_a_question_the_judge_could_not_score_is_retried():
+    unscored = {**row(3), "correctness": None, "faithfulness": None}   # the judge's endpoint failed, not the agent
+    assert gate.retry_list([row(1), unscored]) == [3]
+
+
+def test_a_metric_with_no_scored_answer_has_no_mean():
+    assert gate.mean_scored([{**row(1), "correctness": None}], "correctness") is None
+
+
+def test_a_run_with_nothing_scored_fails_with_a_reason(tmp_path, capsys):
+    first = tmp_path / "first.json"
+    nothing = {"qid": 1, "answer": "No he podido responder.", "correctness": None, "faithfulness": None,
+               "context_relevance": None, "answer_relevance": None}
+    first.write_text(json.dumps({"results": [nothing]}), encoding="utf-8")
+    assert gate.main([str(first)]) == 1
+    out = capsys.readouterr().out
+    assert "FAIL" in out and "correctness: no answer scored" in out
+
+
 @pytest.mark.parametrize("metric", ["correctness", "faithfulness", "context_relevance", "answer_relevance"])
 def test_every_metric_is_gated(metric):
     s = {**BASELINE, metric: BASELINE[metric] - 0.2}

@@ -5,8 +5,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const UPDATED = '2026-10-17';
-const HEADLINE = 'Phase 3 closed: login, guardrails, 30-day sessions · eval 5/4.91/5/5 · top risk now: eu endpoint errors (SMO-27)';
+const UPDATED = '2026-10-24';
+const HEADLINE = 'Phase 4: keyless CI/CD, traces without text, cost per answer, dashboard + alert · next: endpoint failures (SMO-27)';
 
 // ---------------------------------------------------------------- content (edit statuses here)
 const LAPTOP = [
@@ -21,6 +21,8 @@ const GCP = [ // [title, items]
   ['Cost guardrails', [
     ['done', 'Budget €30 + spend cap'],
     ['done', 'Only 6 APIs needed'],
+    ['done', 'Cost per answer · weekly check'],
+    ['done', 'Dashboard + failure alert'],
   ]],
   ['Identity & secrets', [
     ['done', 'sg-agent · 6 roles'],
@@ -33,7 +35,7 @@ const GCP = [ // [title, items]
     ['done', 'Gemini 3.8 Flash · tested'],
     ['done', 'Agent Runtime · eu · 3.0 s'],
     ['done', 'Sessions · 30-day TTL'],
-    ['todo', 'Eval + Observability'],
+    ['done', 'Traces · no message text'],
   ]],
   ['Data · Cloud SQL', [
     ['done', 'sg-catalog · PG18 · free trial'],
@@ -44,6 +46,7 @@ const GCP = [ // [title, items]
     ['done', 'Hybrid search · 17/17 · 0.6 s'],
     ['done', 'StoreGear agent · rules 1-12'],
     ['done', 'Eval gate passed · 4.95'],
+    ['done', 'CI/CD · keyless · smoke checks'],
   ]],
   ['Ingestion pipeline', [
     ['done', 'Parser: Gemini + DocAI fallback'],
@@ -112,7 +115,9 @@ text(40, 68, 1200, `Updated ${UPDATED} · ${HEADLINE}`, { fontSize: 16, textAlig
   text(x + 28, 32, 75, l, { fontSize: 14, textAlign: 'left' });
 });
 
-const TOP = 120, H = 600;
+const MAX_ITEMS = Math.max(...GCP.map(([, items]) => items.length));
+const BOX_H = 45 + MAX_ITEMS * 51 + 6;           // a group box fits its longest list
+const TOP = 120, H = Math.max(600, 50 + 2 * (BOX_H + 15) + 5);
 // laptop
 container(40, TOP, 280, H, 'Your laptop', '#495057', '#f8f9fa');
 LAPTOP.forEach((it, i) => item(55, TOP + 55 + i * 85, 250, 60, it));
@@ -121,7 +126,7 @@ LAPTOP.forEach((it, i) => item(55, TOP + 55 + i * 85, 250, 60, it));
 container(380, TOP, 860, H, 'Google Cloud · storegear-prod-ag26 · europe-west1', '#862e9c', '#f8f0fc');
 GCP.forEach(([title, items], k) => {
   const col = k % 3, row = Math.floor(k / 3);
-  const x = 395 + col * 280, y = TOP + 50 + row * 270, w = 270, h = 255;
+  const x = 395 + col * 280, y = TOP + 50 + row * (BOX_H + 15), w = 270, h = BOX_H;
   container(x, y, w, h, title, '#495057', '#ffffff', 17);
   items.forEach((it, i) => item(x + 12, y + 45 + i * 51, w - 24, 42, it, 14));
 });

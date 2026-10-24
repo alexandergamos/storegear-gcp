@@ -1,6 +1,6 @@
 # Progress summary
 
-*Updated 2026-10-22 (after SMO-24, Phase 3 closed). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
+*Updated 2026-10-24 (after SMO-28 and SMO-25/26, Phase 4 under way). Diagram: [`docs/diagram/progress.excalidraw`](diagram/progress.excalidraw), regenerated with `node docs/diagram/build_progress_diagram.js` after each Linear issue.*
 
 ## In one paragraph
 We are rebuilding the StoreGear shop assistant, today a working n8n agent, entirely on Google Cloud, to learn how a real AI product is built and run. **Phase 0 (foundations) is done.** There's a Google Cloud project with an EU region and a hard spending cap. The code runs under robot identities with minimal permissions and no keys. A first ADK agent already talks to Gemini 3.8 Flash on Agent Platform. **Phase 1 has started:** the database that will hold the manuals is running (on a free 30-day trial), and its tables, Spanish search and permissions are live. The catalog is loaded: 9,054 passages from 10 manuals, each with a Google embedding.
@@ -124,11 +124,22 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 - **What the final check found:** one question (and its duplicate) failed because the right manual section came 7th and the agent only read 5. The agent now reads 7: quality back to 5/5/5/5, about 11 % more text per answer. A smarter fix (a "reranker" that reorders results) is planned as SMO-33.
 - **The real risk now:** in one run, Google's European endpoint failed 9 of 22 questions with server errors. Quality is fine; availability isn't yet. That's next (SMO-27).
 
+### 20. Releases without a laptop (SMO-28 · ADR-018) — Phase 4 started
+- **What:** every change pushed to GitHub is tested automatically. Merging to `main` deploys the API by itself: it signs in to Google Cloud without any key, puts the new version up next to the old one with no users on it, checks five doors (three must open, two must refuse without a login) and only then switches everyone over. The 22-question eval can be run as a release gate with one click, and the 30-day audit runs every week.
+- **Proof:** two deploys from CI (`sg-api-00013`, `sg-api-00015`), both through the checks. The API image is 23 % smaller (97 MB).
+- **Found on the way:** GitHub identifies the repository with numeric ids, not by name, so the first deploy was refused until the permissions matched. And the gate's first run had nothing to grade: instead of saying so, the script crashed. It now fails with a reason, and a question the judge couldn't grade gets a second try.
+
+### 21. Seeing and pricing every answer (SMO-25 / 26 · ADR-019)
+- **What:** every answer leaves one line in the logs: how long each step took, how many tokens it used, which version answered and what it cost, never the question or the answer itself. The agent's traces show each model and tool call, also without text. A dashboard shows answers, failures, speed and cost per answer; three failures in an hour send an email.
+- **Cost per answer** is priced at what Google actually bills this project (read from the billing export), and a weekly report checks the estimate against the bill.
+- **Still to check:** the first real answers after the redeploy, to confirm traces hold no text and the cost line is right.
+
 ## What's next
 | Next | Issue | What happens |
 |---|---|---|
-| 1 | SMO-27 (moved up) | When Google's endpoint fails: retries, a friendly reply instead of an error, an alert, and a decision on a fallback |
-| 2 | SMO-25 / 26 | Tracing and real cost per answer |
+| 1 | SMO-25 / 26 (check) | Confirm on real answers: a trace with no text, an `ANSWER` line with tokens and cost |
+| 2 | SMO-27 | When Google's endpoint fails: retries, a friendly reply instead of an error, an alert, and a decision on a fallback |
+| 3 | Final | n8n vs Google Cloud, side by side, for the delivery PDF |
 
 ## Numbers to beat (n8n, 2026-10-11)
 Correctness 5.00 · Faithfulness 4.95 · Context 5.00 · Answer 5.00 · median 9.0 s · ~$0.008 per answer.
