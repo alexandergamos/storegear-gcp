@@ -323,13 +323,17 @@ gcloud iam service-accounts create sg-ops --project=$PROJECT --display-name="Wee
 gcloud projects add-iam-policy-binding $PROJECT \
   --member=serviceAccount:sg-ops@$PROJECT.iam.gserviceaccount.com --role=roles/aiplatform.user
 
-# 4. Who may become each account: one GitHub environment each (the job's "environment:" line)
+# 4. Who may become each account: one GitHub environment each (the job's "environment:" line).
+#    This repo sends GitHub's *immutable* subject (owner and repo with their numeric ids), so the principal is
+#    repo:alexandergamos@330485277/storegear-gcp@1420440664:environment:<env>. Check yours with:
+#    gh api repos/$REPO/actions/oidc/customization/sub   (sub_claim_prefix). The plain repo:$REPO form is never sent.
+SUBJECT="repo:alexandergamos@330485277/storegear-gcp@1420440664"
 gcloud iam service-accounts add-iam-policy-binding sg-deploy@$PROJECT.iam.gserviceaccount.com --project=$PROJECT \
-  --role=roles/iam.workloadIdentityUser --member="principal://iam.googleapis.com/$POOL/subject/repo:$REPO:environment:production"
+  --role=roles/iam.workloadIdentityUser --member="principal://iam.googleapis.com/$POOL/subject/$SUBJECT:environment:production"
 gcloud iam service-accounts add-iam-policy-binding sg-agent@$PROJECT.iam.gserviceaccount.com --project=$PROJECT \
-  --role=roles/iam.workloadIdentityUser --member="principal://iam.googleapis.com/$POOL/subject/repo:$REPO:environment:eval"
+  --role=roles/iam.workloadIdentityUser --member="principal://iam.googleapis.com/$POOL/subject/$SUBJECT:environment:eval"
 gcloud iam service-accounts add-iam-policy-binding sg-ops@$PROJECT.iam.gserviceaccount.com --project=$PROJECT \
-  --role=roles/iam.workloadIdentityUser --member="principal://iam.googleapis.com/$POOL/subject/repo:$REPO:environment:ops"
+  --role=roles/iam.workloadIdentityUser --member="principal://iam.googleapis.com/$POOL/subject/$SUBJECT:environment:ops"
 
 # 5. The value GitHub needs (repository variable GCP_WIF_PROVIDER)
 echo "$POOL/providers/storegear-gcp"
@@ -343,3 +347,5 @@ echo "$POOL/providers/storegear-gcp"
 **Checks:** a push to any branch runs `ci`; merging to `main` runs `deploy sg-api` (the log prints the image size: v6 was ~126 MB compressed); Actions → `eval gate` → Run workflow asks for approval, then runs the 22 questions; Actions → `retention audit` → Run workflow.
 
 **Later, not now:** the default Compute account keeps Editor until the ingestion worker image also builds in CI (it is still built with `gcloud builds submit`, which uses that account). Removing it earlier would break that build.
+
+**First deploy (2026-10-24):** run 40093473026. The first attempt failed with `iam.serviceAccounts.getAccessToken` denied: the bindings used the plain `repo:OWNER/REPO` subject and GitHub sends the immutable one. After rebinding, revision `sg-api-00013-muk` passed all smoke checks and took 100 % of traffic. Image: **97 MB** compressed (v6: 126 MB, −23 %).
