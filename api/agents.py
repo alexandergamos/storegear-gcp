@@ -86,9 +86,20 @@ def _error(status: int, message: str) -> dict:
     return {"type": "error", "status": status, "message": message}
 
 
+def add_usage(total: dict | None, um: dict | None) -> dict | None:
+    """Adds one model call's usage_metadata to the answer's running total (SMO-26). Thinking is billed as output."""
+    if not um:
+        return total
+    t = total or {"tokens_in": 0, "tokens_cached": 0, "tokens_out": 0, "model_calls": 0}
+    return {"tokens_in": t["tokens_in"] + (um.get("prompt_token_count") or 0),
+            "tokens_cached": t["tokens_cached"] + (um.get("cached_content_token_count") or 0),
+            "tokens_out": t["tokens_out"] + (um.get("candidates_token_count") or 0) + (um.get("thoughts_token_count") or 0),
+            "model_calls": t["model_calls"] + 1}
+
+
 def gcp_events(get_remote: Callable, uid: str, role: str, message: str, session_id: str | None,
                clock=time.monotonic) -> Iterator[dict]:
-    """Steps, then exactly one terminal: answer {text, session_id, guard[, seconds]} or error {status, message}.
+    """Steps, then exactly one terminal: answer {text, session_id, guard[, seconds], usage, topic_check} or error {status, message}.
 
     `message` is already PII-masked by the caller. A guardrail block is a normal answer (the guard's reply).
     `get_remote` is only called once the input guards pass: a blocked question never needs Agent Runtime.
@@ -104,7 +115,8 @@ def gcp_events(get_remote: Callable, uid: str, role: str, message: str, session_
         return
     if hits:
         yield from steps.finish()
-        yield {"type": "answer", "text": REPLY["blocked"], "session_id": session_id, "guard": {"blocked": "input", "filters": hits}}
+        yield {"type": "answer", "text": REPLY["blocked"], "session_id": session_id, "guard": {"blocked": "input", "filters": hits},
+               "usage": None, "topic_check": False}
         return
     try:
         topic_ok = guards.on_topic(message)
@@ -113,7 +125,8 @@ def gcp_events(get_remote: Callable, uid: str, role: str, message: str, session_
         return
     if not topic_ok:
         yield from steps.finish()
-        yield {"type": "answer", "text": REPLY["off_topic"], "session_id": session_id, "guard": {"blocked": "off_topic"}}
+        yield {"type": "answer", "text": REPLY["off_topic"], "session_id": session_id, "guard": {"blocked": "off_topic"},
+               "usage": None, "topic_check": True}
         return
     remote = get_remote()
     sid = session_id
@@ -130,11 +143,12 @@ def gcp_events(get_remote: Callable, uid: str, role: str, message: str, session_
 
     # the agent searches the manuals before its first model call (pre_retrieval), so "searching" starts here
     yield from steps.start(SEARCH)
-    t0, answer, error = time.time(), [], None
+    t0, answer, error, usage = time.time(), [], None, None
     kw = {"run_config": {"streaming_mode": "sse"}} if PARTIAL_EVENTS else {}
     for ev in remote.stream_query(user_id=uid, session_id=sid, message=message, **kw):
         if ev.get("error_code"):
             error = ev["error_code"]
+        usage = add_usage(usage, ev.get("usage_metadata"))
         for p in (ev.get("content") or {}).get("parts", []) or []:
             call, resp = p.get("function_call"), p.get("function_response")
             if call and call.get("name") in TOOL_STEP:
@@ -154,7 +168,7 @@ def gcp_events(get_remote: Callable, uid: str, role: str, message: str, session_
     if found_leak:
         yield from steps.finish()
         yield {"type": "answer", "text": REPLY["leak"], "session_id": sid, "seconds": round(time.time() - t0, 1),
-               "guard": {"blocked": "leak", "leak": found_leak}}
+               "guard": {"blocked": "leak", "leak": found_leak}, "usage": usage, "topic_check": True}
         return
     text, links = guards.strip_links(text)
     text, pii_out = guards.mask_pii(text)
@@ -166,7 +180,7 @@ def gcp_events(get_remote: Callable, uid: str, role: str, message: str, session_
     yield from steps.finish()
     if hits_out:
         yield {"type": "answer", "text": REPLY["blocked"], "session_id": sid, "seconds": round(time.time() - t0, 1),
-               "guard": {"blocked": "output", "filters": hits_out}}
+               "guard": {"blocked": "output", "filters": hits_out}, "usage": usage, "topic_check": True}
         return
     yield {"type": "answer", "text": text, "session_id": sid, "seconds": round(time.time() - t0, 1),
-           "guard": {"pii_out": pii_out, "links_removed": links}}
+           "guard": {"pii_out": pii_out, "links_removed": links}, "usage": usage, "topic_check": True}

@@ -10,6 +10,7 @@
 4. Call Agent Runtime AS sg-api: session user_id = uid, state user:role = role FROM THE TOKEN.
    The request body can't carry a role; a session created with another role is never reused.
 """
+import hashlib
 import json
 import logging
 import os
@@ -33,6 +34,7 @@ from pydantic import BaseModel, Field
 
 import agents
 import catalog
+import cost
 import guards
 import stream
 from store import CompareStore, PgStore, other
@@ -45,6 +47,8 @@ INSTANCE = f"{PROJECT}:europe-west1:sg-catalog"
 DB_USER = os.getenv("STOREGEAR_API_DB_USER", f"sg-api@{PROJECT}.iam")
 # honest mode (2026-10-23): while Google restricts Agent Platform, the web demo talks to n8n alone, by name
 GCP_STATUS = os.getenv("STOREGEAR_GCP_STATUS", "ok")   # "ok" | "restricted"
+RELEASE = os.getenv("STOREGEAR_RELEASE", "dev")   # the commit the CI deployed (ADR-018); ties each answer to its code
+MODEL = os.getenv("STOREGEAR_MODEL", "gemini-3.8-flash")
 PER_MIN, PER_DAY = int(os.getenv("STOREGEAR_RATE_PER_MIN", "20")), int(os.getenv("STOREGEAR_RATE_PER_DAY", "300"))
 ROLES = {"staff", "manager"}
 POOL = ThreadPoolExecutor(8)
@@ -139,7 +143,7 @@ def chat(body: Ask, who: dict = Depends(user)) -> dict:
     # INPUT (ADR-015): PII masked first, so nothing downstream (Model Armor, the model, the session, logs) sees it
     message, pii_in = guards.mask_pii(body.message)
     end = None
-    for end in agents.gcp_events(remote, who["uid"], who["role"], message, body.session_id):
+    for end in watched("gcp", agents.gcp_events(remote, who["uid"], who["role"], message, body.session_id), who["uid"], None, who["role"]):
         pass
     if end["type"] == "error":
         raise HTTPException(end["status"], end["message"])
@@ -178,12 +182,38 @@ def log_failure(agent: str, uid: str, conversation_id: str | None, reason: str) 
                             "conversation_id": conversation_id, "reason": reason[:300]}, ensure_ascii=False))
 
 
-def watched(agent: str, events, uid: str, conversation_id: str | None):
-    """Passes an agent's events through, logging its error terminal or exception (then re-raising it)."""
+def uid_hash(uid: str) -> str:
+    """Answers per user can be counted without the logs holding who they are."""
+    return hashlib.sha256(uid.encode()).hexdigest()[:16]
+
+
+def log_answer(agent: str, uid: str, role: str | None, conversation_id: str | None, steps: list[dict], total_ms: int, end: dict) -> None:
+    """SMO-25/26 (ADR-019): what happened in one answer and what it cost. Never the question, the answer or the uid."""
+    usage = end.get("usage")
+    guard = (end.get("guard") or {}).get("blocked")
+    price = cost.estimate(usage, end.get("topic_check", False)) if agent == "gcp" else None
+    u = usage or {"tokens_in": 0, "tokens_cached": 0, "tokens_out": 0, "model_calls": 0}
+    log.warning(json.dumps({
+        "severity": "INFO", "event": "ANSWER", "agent": agent, "uid_hash": uid_hash(uid), "role": role,
+        "conversation_id": conversation_id or end.get("session_id"), "guard": guard, "steps": steps, "total_ms": total_ms,
+        "tokens_in": u["tokens_in"], "tokens_cached": u["tokens_cached"], "tokens_out": u["tokens_out"], "model_calls": u["model_calls"],
+        "model": MODEL if agent == "gcp" else None, "release": RELEASE,
+        "cost_eur": round(price["eur"], 7) if price else None, "cost_usd": round(price["usd"], 7) if price else None,
+    }, ensure_ascii=False))
+
+
+def watched(agent: str, events, uid: str, conversation_id: str | None, role: str | None = None):
+    """Passes an agent's events through, logging its error terminal or exception (then re-raising it),
+    and one ANSWER line when it answers (ADR-019)."""
+    t0, steps = time.monotonic(), []
     try:
         for e in events:
             if e["type"] == "error":
                 log_failure(agent, uid, conversation_id, e["message"])
+            elif e["type"] == "step" and e.get("status") == "done":
+                steps.append({"label": e["label"], "ms": e.get("ms")})
+            elif e["type"] == "answer":
+                log_answer(agent, uid, role, conversation_id, steps, round((time.monotonic() - t0) * 1000), e)
             yield e
     except Exception as ex:
         log_failure(agent, uid, conversation_id, f"{type(ex).__name__}: {ex}")
@@ -200,7 +230,7 @@ def chat_stream(body: Ask, who: dict = Depends(user)):
         t0 = time.monotonic()
         end = None
         try:
-            for e in watched("gcp", agents.gcp_events(remote, who["uid"], who["role"], message, body.session_id), who["uid"], None):
+            for e in watched("gcp", agents.gcp_events(remote, who["uid"], who["role"], message, body.session_id), who["uid"], None, who["role"]):
                 if e["type"] == "step":
                     yield stream.sse("step", {k: e[k] for k in ("label", "status", "ms") if k in e})
                 else:
@@ -234,7 +264,7 @@ def n8n_stream(body: Ask, who: dict = Depends(user)):
         t0 = time.monotonic()
         end = None
         n8n = stream.n8n_events(lambda: agents.ask_n8n(message, who["uid"], conversation_id))
-        for e in watched("n8n", n8n, who["uid"], conversation_id):
+        for e in watched("n8n", n8n, who["uid"], conversation_id, who["role"]):
             if e["type"] == "step":
                 yield stream.sse("step", {"label": e["label"], "status": e["status"]})
             else:
@@ -278,7 +308,7 @@ def compare(body: CompareAsk, who: dict = Depends(demo_user), store: CompareStor
     # remote() runs inside the slot's thread, after the guards: if Agent Runtime is unreachable, only this slot fails
     gcp = agents.gcp_events(remote, who["uid"], who["role"], message, conv.gcp_session_id)
     n8n = stream.n8n_events(lambda: agents.ask_n8n(message, who["uid"], conv.id))
-    by_agent = {"gcp": watched("gcp", gcp, who["uid"], conv.id), "n8n": watched("n8n", n8n, who["uid"], conv.id)}
+    by_agent = {"gcp": watched("gcp", gcp, who["uid"], conv.id, who["role"]), "n8n": watched("n8n", n8n, who["uid"], conv.id, who["role"])}
     gcp_slot = "A" if conv.mapping_a == "gcp" else "B"
 
     def events():

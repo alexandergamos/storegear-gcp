@@ -1,0 +1,14 @@
+# SMO-26 (ADR-019) · estimated cost of each Google Cloud answer (EUR, api/cost.py)
+name: sg_answer_cost_eur
+description: Estimated cost per Google Cloud answer in EUR (ANSWER lines)
+filter: resource.type="cloud_run_revision" AND resource.labels.service_name="sg-api" AND jsonPayload.event="ANSWER" AND jsonPayload.agent="gcp"
+valueExtractor: EXTRACT(jsonPayload.cost_eur)
+bucketOptions:
+  exponentialBuckets:
+    numFiniteBuckets: 40
+    growthFactor: 1.3
+    scale: 0.0001
+metricDescriptor:
+  metricKind: DELTA
+  valueType: DISTRIBUTION
+  unit: "1"

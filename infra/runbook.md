@@ -349,3 +349,29 @@ echo "$POOL/providers/storegear-gcp"
 **Later, not now:** the default Compute account keeps Editor until the ingestion worker image also builds in CI (it is still built with `gcloud builds submit`, which uses that account). Removing it earlier would break that build.
 
 **First deploy (2026-10-24):** run 40093473026. The first attempt failed with `iam.serviceAccounts.getAccessToken` denied: the bindings used the plain `repo:OWNER/REPO` subject and GitHub sends the immutable one. After rebinding, revision `sg-api-00013-muk` passed all smoke checks and took 100 % of traffic. Image: **97 MB** compressed (v6: 126 MB, −23 %).
+
+## SMO-25/26 · Traces, one line per answer, cost per answer (2026-10-24; ADR-019)
+Alexander runs these from the repository root (PowerShell), in this order. The APIs (Cloud Trace, Telemetry, Monitoring, Logging) are already enabled; the billing export already writes to `billing_export`.
+
+```powershell
+$P = "storegear-prod-ag26"
+
+# 1. Log-based metrics: they only count from the moment they exist, so before the new sg-api goes live
+foreach ($m in "sg_answers", "sg_answer_latency_ms", "sg_answer_cost_eur", "sg_agent_failures") {
+  gcloud logging metrics create $m --project=$P --config-from-file="infra/monitoring/$m.yaml"
+}
+
+# 2. The dashboard and the failure alert (email channel "Alex")
+gcloud monitoring dashboards create --project=$P --config-from-file=infra/monitoring/dashboard.json
+gcloud alpha monitoring policies create --project=$P --policy-from-file=infra/monitoring/alert-agent-failures.json
+
+# 3. The agent with traces on and message content off (takes a few minutes)
+uv run python infra/deploy_agent_runtime.py --update
+```
+
+Then:
+- **Merge the SMO-25/26 pull request:** the CI deploys sg-api with the ANSWER lines and `STOREGEAR_RELEASE`.
+- **Run the eval gate** (Actions → eval gate) on the redeployed agent: same quality expected, now with traces.
+- **Check a trace:** console → Agent Platform → the agent → Traces. Open one: model and tool calls with times and tokens, **no question or answer text**.
+- **Check an ANSWER line:** Logs Explorer, `jsonPayload.event="ANSWER"`: tokens, cost, release, no text.
+- **Weekly:** `uv run python eval/cost_report.py` (estimated vs billed).

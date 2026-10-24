@@ -8,6 +8,7 @@ The resource name is saved in infra/agent_runtime.json (committed; it is an iden
 import argparse
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -40,6 +41,12 @@ ENV = {
     "STOREGEAR_SHEETS_SA": SA,  # self-impersonation for a spreadsheets-scoped token (metadata tokens lack it)
     "STOREGEAR_PROJECT_ID": PROJECT,  # the runtime's GOOGLE_CLOUD_PROJECT is the project number
     "STOREGEAR_DB_USER": f"sg-agent@{PROJECT}.iam",  # runtime credentials don't expose the SA email until refreshed
+    # SMO-25 (ADR-019): traces of model and tool calls to Cloud Trace (the SDK's supported switch; enable_tracing is
+    # deprecated). Prompt and answer text are NOT captured: content capture stays explicitly off.
+    "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY": "true",
+    "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "false",
+    "STOREGEAR_RELEASE": subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
+                                        cwd=ROOT).stdout.strip() or "dev",   # the commit this agent was deployed from
 }
 
 

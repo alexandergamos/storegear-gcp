@@ -1,0 +1,35 @@
+{
+  "displayName": "StoreGear: agent failures",
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "Three or more answers failed in the last hour (sg-api, AGENT_FAILED). Look at the reason in Cloud Logging: `jsonPayload.event=\"AGENT_FAILED\"`. A burst of 5xx from Agent Platform is the usual cause (SMO-27)."
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "3+ failed answers in an hour",
+      "conditionThreshold": {
+        "filter": "metric.type=\"logging.googleapis.com/user/sg_agent_failures\" AND resource.type=\"cloud_run_revision\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "3600s",
+            "perSeriesAligner": "ALIGN_SUM",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 2,
+        "duration": "0s",
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "notificationChannels": [
+    "projects/storegear-prod-ag26/notificationChannels/2611342259868498643"
+  ],
+  "alertStrategy": {
+    "autoClose": "86400s"
+  }
+}
