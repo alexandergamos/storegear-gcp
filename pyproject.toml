@@ -3,7 +3,26 @@ name = "storegear-gcp"
 version = "0.1.0"
 description = "StoreGear Assistant rebuilt on Gemini Enterprise Agent Platform with ADK"
 requires-python = ">=3.12,<3.13"
-dependencies = [
+# Every component installs only its own group (ADR-018): the sg-api image takes "api" alone.
+dependencies = []
+
+[tool.uv]
+package = false
+# on the laptop and in CI everything is installed, as before the split
+default-groups = ["dev", "api", "workers"]
+
+[dependency-groups]
+# what api/*.py imports, and nothing else
+api = [
+    "cloud-sql-python-connector[pg8000]>=1.23.0",
+    "fastapi>=0.115",
+    "google-cloud-aiplatform[agent-engines]>=1.112",
+    "httpx>=0.28.1",
+    "pyjwt>=2.15.1",
+    "uvicorn>=0.30",
+]
+# the agent, ingestion, eval and infra scripts
+workers = [
     "cloud-sql-python-connector[pg8000]>=1.23.0",
     "fastapi>=0.115",
     "google-adk>=2.0",
@@ -17,11 +36,6 @@ dependencies = [
     "sqlalchemy>=2.1.5",
     "uvicorn>=0.30",
 ]
-
-[tool.uv]
-package = false
-
-[dependency-groups]
 dev = [
     "pytest>=9.1.1",
 ]

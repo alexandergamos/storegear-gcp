@@ -1,6 +1,6 @@
 # ADR-018 — CI/CD: GitHub Actions with keyless deploys, and the eval as a release gate
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-24, Alexander: option A)
 - **Date:** 2026-10-24
 - **Linear:** SMO-28
 - **Deciders:** Alexander (decides) · Claude (drafts)
@@ -24,21 +24,22 @@ n8n has no CI: changes are made in the editor and a nightly workflow backs them 
 | B. Cloud Build triggers connected to GitHub | Everything stays inside Google Cloud, one IAM model, no federation | The GitHub connection is set up in the console; results are less visible from the repo; tests and deploy in one YAML that is harder to run locally | Free within Cloud Build's daily allowance |
 | C. GitHub Actions for tests only; deploys stay manual | No cloud access from CI at all, nothing to federate | Doesn't remove the manual path to production, the risk E4 names; Editor can't be removed from the default account | Free |
 
-## Decision (proposed)
-**A**, in three workflows:
+## Decision
+**A**, in four workflows (`.github/workflows/`):
 
 1. **`ci.yml`, on every push and pull request** (no cloud credentials): `uv sync`, then the unit tests of `api/`, `infra/` and `eval/` with fakes. A red test blocks the merge.
-2. **`deploy-api.yml`, on push to `main` when `api/` or the prompt changes:** keyless login as `sg-deploy` → build the image with Cloud Build (its own `sg-build` account) → deploy a new `sg-api` revision **with no traffic**, tagged `candidate` → smoke checks against the candidate URL (`/status`, `/catalog/models`, 401 without a token, 403 without a role) → move 100 % of traffic. If a check fails, the old revision keeps serving.
-3. **`eval-gate.yml`, by hand (workflow_dispatch) and before any agent or prompt release**, protected by a GitHub environment that needs Alexander's approval: the 22-question eval through the deployed agent. **Pass rule:** every metric ≥ baseline − 0.1. Questions that fail on an availability error (5xx/timeout) are retried once before scoring, so a Google hiccup doesn't block a release; a wrong answer is never retried. The result JSON is attached to the run.
+2. **`deploy-api.yml`, on push to `main` when `api/`, the prompt or the dependencies change:** the same tests → keyless login as `sg-deploy` → build the image **on the GitHub runner** and push it to Artifact Registry → deploy a new `sg-api` revision **with no traffic**, tagged `candidate` → smoke checks against the candidate URL (`/health`, `/status`, `/catalog/models`, 401 on `/chat` and `/compare` without a login) → move 100 % of traffic. If a check fails, the old revision keeps serving. The role checks (403, staff vs manager) need test passwords, so they stay in `eval/auth_tests.py`, run by hand, instead of becoming GitHub secrets.
+3. **`eval-gate.yml`, by hand (workflow_dispatch) and before any agent or prompt release**, protected by a GitHub environment that needs Alexander's approval: the 22-question eval of the deployed agent, as `sg-agent` (the identity the eval uses on the laptop). **Pass rule** (`eval/gate.py`): every metric ≥ baseline − 0.1 and no availability error left. Questions whose answer is an availability error (`ERROR …` from `run_eval.py`) run once more before scoring; a wrong answer is never retried. The result JSON is attached to the run.
+4. **`retention.yml`, weekly:** the 30-day audit (ADR-016) as `sg-ops`, an account limited to Agent Sessions.
 
 Alongside:
-- **A slimmer `sg-api` image:** dependencies split into groups (`api`, `agent`, `ingestion`); the API image installs only what it imports.
-- **`sg-build`** builds images; then **Editor comes off the default Compute account** (closes the ADR-014 item).
-- **The 30-day retention audit** (ADR-016) runs weekly from Actions with the same keyless login and an `sg-ops` account limited to Agent Sessions.
+- **A slimmer `sg-api` image:** dependencies split into two groups, `api` (what `api/*.py` imports) and `workers` (agent, ingestion, eval, infra). The API image installs `api` only; the laptop and CI install both, as before. The 96 API tests pass with the `api` group alone.
+- **Each GitHub environment can become one account only** (`production` → `sg-deploy`, `eval` → `sg-agent`, `ops` → `sg-ops`), and the federation trusts tokens from this repository only.
+- **Editor on the default Compute account** stays until the ingestion worker image also builds in CI: it is still built with `gcloud builds submit`, which uses that account.
 
 ## Consequences
-- **Good:** no change reaches production without passing tests; deploys are repeatable and logged; no keys exist anywhere; the jury sees green checks on the repo; the Editor leftover is closed.
-- **Bad / accepted trade-offs:** the eval gate is manual (it costs about $0.25 per run and a single run is noisy), so prompt quality relies on running it before a release; federation adds IAM to understand.
+- **Good:** no change to sg-api reaches production without passing tests and smoke checks; deploys are repeatable and logged; no keys exist anywhere; the jury sees green checks on the repo.
+- **Bad / accepted trade-offs:** the eval gate is manual (it costs about $0.25 per run and a single run is noisy), so prompt quality relies on running it before a release; federation adds IAM to understand; the agent itself (Agent Runtime) still deploys with `infra/deploy_agent_runtime.py` by hand; the Editor leftover stays open for now.
 - **Caveats and gotchas:** the federation provider must restrict tokens to this repository (`attribute.repository`) and, for deploys, to `main`, or any fork could deploy; the `candidate` tag URL is public like the service itself (it still requires a login); Cloud Run keeps the last revisions, so rollback is `gcloud run services update-traffic`.
 
 ## Revisit when

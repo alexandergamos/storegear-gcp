@@ -1,0 +1,74 @@
+# SMO-28 · Deploy sg-api on every change that reaches main (ADR-018).
+# Keyless: GitHub's token is exchanged for a short-lived Google token (Workload Identity Federation) as sg-deploy.
+# The new revision gets no traffic until the smoke checks pass; if one fails, the current revision keeps serving.
+name: deploy sg-api
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+      - "agent/storegear/prompts/system_es.md"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # lets the job ask GitHub for the OIDC token that Google exchanges
+
+concurrency:
+  group: deploy-sg-api
+  cancel-in-progress: false   # never stop a deploy half-way
+
+env:
+  PROJECT: storegear-prod-ag26
+  REGION: europe-west1
+  SERVICE: sg-api
+  IMAGE: europe-docker.pkg.dev/storegear-prod-ag26/storegear/sg-api
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production   # only main may use it (set in the repo's environments)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sign in to Google Cloud as sg-deploy (no keys)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: sg-deploy@storegear-prod-ag26.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and push the image (the "api" dependency group only)
+        run: |
+          gcloud auth configure-docker europe-docker.pkg.dev --quiet
+          TAG="${GITHUB_SHA::7}"
+          docker build -f api/Dockerfile -t "$IMAGE:$TAG" .
+          docker image ls "$IMAGE:$TAG" --format 'image size: {{.Size}}'
+          docker push "$IMAGE:$TAG"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Deploy a candidate revision with no traffic
+        run: gcloud run deploy "$SERVICE" --image "$IMAGE:$TAG" --region "$REGION" --no-traffic --tag candidate --quiet
+
+      - name: Smoke checks against the candidate
+        run: |
+          URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format=json \
+            | python3 -c "import json,sys; print(next(t['url'] for t in json.load(sys.stdin)['status']['traffic'] if t.get('tag') == 'candidate'))")
+          check() { want=$1; shift; got=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "$@"); echo "$got (want $want) $*"; [ "$got" = "$want" ]; }
+          check 200 "$URL/health"
+          check 200 "$URL/status"
+          check 200 "$URL/catalog/models"
+          check 401 -X POST "$URL/chat" -H "content-type: application/json" -d '{"message":"hola"}'
+          check 401 -X POST "$URL/compare" -H "content-type: application/json" -d '{"message":"hola"}'
+
+      - name: Send all traffic to the new revision
+        run: gcloud run services update-traffic "$SERVICE" --region "$REGION" --to-latest --quiet
