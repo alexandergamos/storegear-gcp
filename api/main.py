@@ -10,23 +10,32 @@
 4. Call Agent Runtime AS sg-api: session user_id = uid, state user:role = role FROM THE TOKEN.
    The request body can't carry a role; a session created with another role is never reused.
 """
+import json
+import logging
 import os
 import random
 import threading
 import time
+import uuid
 import warnings
 from concurrent.futures import ThreadPoolExecutor
+from typing import Literal
 
 import google.auth
 import google.auth.transport.requests
 import vertexai
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from google.cloud.sql.connector import Connector
 from google.oauth2 import id_token
 from pydantic import BaseModel, Field
 
+import agents
+import catalog
 import guards
+import stream
+from store import CompareStore, PgStore, other
 
 warnings.filterwarnings("ignore")
 PROJECT = os.getenv("STOREGEAR_PROJECT_ID", "storegear-prod-ag26")
@@ -34,15 +43,13 @@ AGENT = os.getenv("STOREGEAR_AGENT_RESOURCE", "projects/1066603052728/locations/
 AGENT_LOCATION = os.getenv("STOREGEAR_AGENT_LOCATION", "eu")
 INSTANCE = f"{PROJECT}:europe-west1:sg-catalog"
 DB_USER = os.getenv("STOREGEAR_API_DB_USER", f"sg-api@{PROJECT}.iam")
-SESSION_TTL = os.getenv("STOREGEAR_SESSION_TTL", f"{30 * 24 * 3600}s")   # 30 days, then the platform deletes it (ADR-016)
+# honest mode (2026-10-23): while Google restricts Agent Platform, the web demo talks to n8n alone, by name
+GCP_STATUS = os.getenv("STOREGEAR_GCP_STATUS", "ok")   # "ok" | "restricted"
 PER_MIN, PER_DAY = int(os.getenv("STOREGEAR_RATE_PER_MIN", "20")), int(os.getenv("STOREGEAR_RATE_PER_DAY", "300"))
 ROLES = {"staff", "manager"}
 POOL = ThreadPoolExecutor(8)
-REPLY = {   # what the employee sees when a guardrail stops a request (ADR-015)
-    "blocked": "Lo siento, no puedo ayudar con esa petición. Puedo responder sobre los relojes del catálogo, su precio y stock, y las políticas de la tienda.",
-    "off_topic": "Solo puedo ayudarte con los relojes del catálogo (especificaciones, uso, precio y stock) y con las políticas de la tienda. ¿Qué necesitas saber?",
-    "leak": "No puedo compartir detalles internos sobre cómo funciono. ¿En qué te ayudo con el catálogo?",
-}
+REPLY = agents.REPLY
+log = logging.getLogger("sg-api")   # WARNING lines go to stderr as JSON; Cloud Logging reads them as structured entries
 
 app = FastAPI(title="StoreGear API", docs_url=None, redoc_url=None, openapi_url=None)   # no public API map
 app.add_middleware(CORSMiddleware, allow_origins=[o for o in os.getenv("STOREGEAR_ALLOWED_ORIGINS", "").split(",") if o],
@@ -83,7 +90,8 @@ def user(authorization: str = Header(default="")) -> dict:
         raise HTTPException(401, "invalid token") from None
     if not claims or claims.get("role") not in ROLES:
         raise HTTPException(403, "no role assigned")
-    return {"uid": claims["sub"], "role": claims["role"]}
+    # demo accounts (jury) see the blind comparison; only a literal JSON true counts
+    return {"uid": claims["sub"], "role": claims["role"], "demo": claims.get("demo") is True}
 
 
 def rate_limit(uid: str) -> None:
@@ -109,6 +117,17 @@ class Ask(BaseModel):
     session_id: str | None = None
 
 
+class CompareAsk(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+    conversation_id: str | None = None
+
+
+def demo_user(who: dict = Depends(user)) -> dict:
+    if not who["demo"]:
+        raise HTTPException(403, "demo only")
+    return who
+
+
 @app.get("/health")   # not /healthz: Cloud Run's front end reserves paths ending in "z"
 def health() -> dict:
     return {"ok": True}
@@ -119,56 +138,193 @@ def chat(body: Ask, who: dict = Depends(user)) -> dict:
     rate_limit(who["uid"])
     # INPUT (ADR-015): PII masked first, so nothing downstream (Model Armor, the model, the session, logs) sees it
     message, pii_in = guards.mask_pii(body.message)
-    guard = {"pii_in": pii_in}
-    # Model Armor FIRST, the topic check (a Gemini call) only if the text is clean: content Model Armor blocks must
-    # never reach the model, not even for classification.
+    end = None
+    for end in agents.gcp_events(remote, who["uid"], who["role"], message, body.session_id):
+        pass
+    if end["type"] == "error":
+        raise HTTPException(end["status"], end["message"])
+    out = {"session_id": end["session_id"], "answer": end["text"]}
+    if "seconds" in end:
+        out["seconds"] = end["seconds"]
+    return {**out, "guard": {"pii_in": pii_in, **end["guard"]}}
+
+
+MODELS_TTL = 600   # seconds; the catalog changes when a manual is ingested, a few times a week at most
+_models_cache: tuple[float, list[str]] | None = None
+
+
+def staff_file_names() -> list[str]:
+    conn = db()
     try:
-        hits = guards.armor(message)
-    except Exception:  # noqa: BLE001  fail closed: an unchecked question never reaches the agent
-        raise HTTPException(503, "guardrail unavailable") from None
-    if hits:
-        return {"session_id": body.session_id, "answer": REPLY["blocked"], "guard": {**guard, "blocked": "input", "filters": hits}}
+        cur = conn.cursor()
+        cur.execute("""SELECT DISTINCT file_name FROM catalog_chunks
+                       WHERE access_level = 'staff' AND file_id <> 'polar-common'""")
+        return [r[0] for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+@app.get("/catalog/models")   # public: the web demo's empty state lists the models before anyone signs in
+def catalog_models() -> dict:
+    global _models_cache
+    if _models_cache is None or time.time() - _models_cache[0] > MODELS_TTL:
+        _models_cache = (time.time(), catalog.list_models(staff_file_names))
+    return {"models": _models_cache[1]}
+
+
+def log_failure(agent: str, uid: str, conversation_id: str | None, reason: str) -> None:
+    """Why an agent failed, for us; the client only ever sees the fixed text. Never the question or a token."""
+    log.warning(json.dumps({"severity": "WARNING", "event": "AGENT_FAILED", "agent": agent, "uid": uid,
+                            "conversation_id": conversation_id, "reason": reason[:300]}, ensure_ascii=False))
+
+
+def watched(agent: str, events, uid: str, conversation_id: str | None):
+    """Passes an agent's events through, logging its error terminal or exception (then re-raising it)."""
     try:
-        topic_ok = guards.on_topic(message)
-    except Exception:  # noqa: BLE001
-        raise HTTPException(503, "guardrail unavailable") from None
-    if not topic_ok:
-        return {"session_id": body.session_id, "answer": REPLY["off_topic"], "guard": {**guard, "blocked": "off_topic"}}
-    r = remote()
-    sid = body.session_id
-    if sid:
+        for e in events:
+            if e["type"] == "error":
+                log_failure(agent, uid, conversation_id, e["message"])
+            yield e
+    except Exception as ex:
+        log_failure(agent, uid, conversation_id, f"{type(ex).__name__}: {ex}")
+        raise
+
+
+@app.post("/chat/stream")
+def chat_stream(body: Ask, who: dict = Depends(user)):
+    """/chat for the web app: the same flow, streamed as progress steps with their real times (spec §6.2)."""
+    rate_limit(who["uid"])
+    message, _ = guards.mask_pii(body.message)
+
+    def events():
+        t0 = time.monotonic()
+        end = None
         try:
-            s = r.get_session(user_id=who["uid"], session_id=sid)   # only the owner's sessions are found
-        except Exception:  # noqa: BLE001
-            raise HTTPException(404, "session not found") from None
-        if (s.get("state") or {}).get("user:role") != who["role"]:
-            sid = None   # the role changed since this session started: never reuse it
-    if not sid:
-        sid = r.create_session(user_id=who["uid"], state={"user:role": who["role"]}, ttl=SESSION_TTL)["id"]
-    t0, answer, error = time.time(), [], None
-    for ev in r.stream_query(user_id=who["uid"], session_id=sid, message=message):
-        if ev.get("error_code"):
-            error = ev["error_code"]
-        for p in (ev.get("content") or {}).get("parts", []) or []:
-            if p.get("text") and not p.get("thought") and ev.get("author") != "user":
-                answer.append(p["text"])
-    if not answer:
-        raise HTTPException(502, f"agent error: {error or 'empty answer'}")
-    # OUTPUT: leaks of how we're built, links outside the brands, PII, and Model Armor's harm filters
-    text = answer[-1]
-    found_leak = guards.leak(text)
-    if found_leak:
-        return {"session_id": sid, "answer": REPLY["leak"], "seconds": round(time.time() - t0, 1), "guard": {**guard, "blocked": "leak", "leak": found_leak}}
-    text, links = guards.strip_links(text)
-    text, pii_out = guards.mask_pii(text)
-    try:
-        hits_out = guards.armor(text, response=True)
-    except Exception:  # noqa: BLE001
-        raise HTTPException(503, "guardrail unavailable") from None
-    if hits_out:
-        return {"session_id": sid, "answer": REPLY["blocked"], "seconds": round(time.time() - t0, 1), "guard": {**guard, "blocked": "output", "filters": hits_out}}
-    return {"session_id": sid, "answer": text, "seconds": round(time.time() - t0, 1),
-            "guard": {**guard, "pii_out": pii_out, "links_removed": links}}
+            for e in watched("gcp", agents.gcp_events(remote, who["uid"], who["role"], message, body.session_id), who["uid"], None):
+                if e["type"] == "step":
+                    yield stream.sse("step", {k: e[k] for k in ("label", "status", "ms") if k in e})
+                else:
+                    end = e
+        except Exception:  # noqa: BLE001  Agent Runtime unreachable or broken mid-stream: the client gets the fixed text
+            end = None
+        total_ms = round((time.monotonic() - t0) * 1000)
+        if end and end["type"] == "answer":
+            yield stream.sse("answer", {"text": end["text"], "total_ms": total_ms, "session_id": end["session_id"]})
+        else:
+            yield stream.sse("error", {"message": stream.FAILED, "total_ms": total_ms})
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/status")   # public: the web app reads it to choose comparison or honest mode
+def status() -> dict:
+    return {"gcp": GCP_STATUS}
+
+
+@app.post("/n8n/stream")
+def n8n_stream(body: Ask, who: dict = Depends(user)):
+    """Honest mode only: the n8n agent alone, by name. Its steps are simulated, so they carry no per-step time."""
+    if GCP_STATUS != "restricted":
+        raise HTTPException(404, "not available")
+    rate_limit(who["uid"])
+    message, _ = guards.mask_pii(body.message)
+    conversation_id = (body.session_id or uuid.uuid4().hex)[:100]   # n8n keys its memory by this id
+
+    def events():
+        t0 = time.monotonic()
+        end = None
+        n8n = stream.n8n_events(lambda: agents.ask_n8n(message, who["uid"], conversation_id))
+        for e in watched("n8n", n8n, who["uid"], conversation_id):
+            if e["type"] == "step":
+                yield stream.sse("step", {"label": e["label"], "status": e["status"]})
+            else:
+                end = e
+        total_ms = round((time.monotonic() - t0) * 1000)
+        if end and end["type"] == "answer":
+            yield stream.sse("answer", {"text": end["text"], "total_ms": total_ms, "session_id": conversation_id})
+        else:
+            yield stream.sse("error", {"message": stream.FAILED, "total_ms": total_ms})
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
+# ---------------------------------------------------------------- blind comparison for the web demo (ADR-017)
+RNG = random.SystemRandom()   # which agent is A, drawn once per conversation
+_store: CompareStore | None = None
+
+
+def get_store() -> CompareStore:
+    global _store
+    if _store is None:
+        _store = PgStore(db)
+    return _store
+
+
+@app.post("/compare")
+def compare(body: CompareAsk, who: dict = Depends(demo_user), store: CompareStore = Depends(get_store)):
+    """Both agents at once, blind: slots A/B only; the mapping stays here until /conversations/{id}/reveal."""
+    rate_limit(who["uid"])   # one compare = one request, although it asks two agents
+    conv = None
+    if body.conversation_id:
+        conv = store.get_conversation(body.conversation_id, who["uid"])
+        if not conv:
+            raise HTTPException(404, "conversation not found")   # another user's id looks like a missing one
+        if conv.revealed:
+            raise HTTPException(409, "conversation closed")
+    message, _ = guards.mask_pii(body.message)   # before EITHER agent sees it
+    if not conv:
+        conv = store.get_conversation(store.create_conversation(who["uid"], RNG.choice(["gcp", "n8n"])), who["uid"])
+
+    # remote() runs inside the slot's thread, after the guards: if Agent Runtime is unreachable, only this slot fails
+    gcp = agents.gcp_events(remote, who["uid"], who["role"], message, conv.gcp_session_id)
+    n8n = stream.n8n_events(lambda: agents.ask_n8n(message, who["uid"], conv.id))
+    by_agent = {"gcp": watched("gcp", gcp, who["uid"], conv.id), "n8n": watched("n8n", n8n, who["uid"], conv.id)}
+    gcp_slot = "A" if conv.mapping_a == "gcp" else "B"
+
+    def events():
+        yield stream.sse("conversation", {"conversation_id": conv.id})
+        totals, failed = {"A": None, "B": None}, {"A": False, "B": False}
+        for e in stream.merge_blind({"A": by_agent[conv.mapping_a], "B": by_agent[other(conv.mapping_a)]}):
+            slot = e["slot"]
+            if e["type"] == "step":
+                yield stream.sse("step", {"slot": slot, "label": e["label"], "status": e["status"]})
+                continue
+            totals[slot] = e["total_ms"]
+            if e["type"] == "answer":
+                sid = e.get("session_id")
+                if slot == gcp_slot and sid and sid != conv.gcp_session_id:
+                    store.set_gcp_session(conv.id, sid)
+                yield stream.sse("answer", {"slot": slot, "text": e["text"], "total_ms": e["total_ms"]})
+            else:
+                failed[slot] = True
+                yield stream.sse("error", {"slot": slot, "message": e["message"], "total_ms": e["total_ms"]})
+        k = store.add_comparison(conv.id, who["uid"], message, totals["A"], totals["B"], failed["A"], failed["B"])
+        yield stream.sse("done", {"comparison_id": k, "votable": not (failed["A"] or failed["B"])})
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
+class VoteBody(BaseModel):
+    vote: Literal["A", "B", "tie"]
+
+
+@app.post("/compare/{comparison_id}/vote")
+def vote(comparison_id: str, body: VoteBody, who: dict = Depends(demo_user), store: CompareStore = Depends(get_store)) -> dict:
+    result = store.vote(comparison_id, who["uid"], body.vote)
+    if result == "not_found":
+        raise HTTPException(404, "comparison not found")
+    if result == "conflict":
+        raise HTTPException(409, "already voted, not votable or conversation closed")
+    return {"ok": True}
+
+
+@app.post("/conversations/{conversation_id}/reveal")
+def reveal(conversation_id: str, who: dict = Depends(demo_user), store: CompareStore = Depends(get_store)) -> dict:
+    """Ends the conversation: from now on no questions or votes, and the client learns which agent was which."""
+    out = store.reveal(conversation_id, who["uid"])
+    if out is None:
+        raise HTTPException(404, "conversation not found")
+    return out
 
 
 # ---------------------------------------------------------------- history (ADR-016): no model call, own sessions only

@@ -28,3 +28,4 @@ Thumbs.db
 
 # ADK local dev state (adk web sessions)
 .adk/
+.superpowers/

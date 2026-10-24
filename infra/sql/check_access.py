@@ -7,6 +7,7 @@
   so the test runs with exactly their permissions.
 Expected: everyone can read; only sg-ingestion can write; sg-agent's write is refused.
 """
+import os
 import google.auth
 from google.auth import impersonated_credentials
 from google.cloud.sql.connector import Connector
@@ -42,6 +43,6 @@ def check(label: str, db_user: str, sa: str | None) -> None:
 
 
 if __name__ == "__main__":
-    check("alexander", "{{ADMIN_EMAIL}}", None)
+    check("alexander", os.environ["STOREGEAR_ADMIN_EMAIL"], None)
     check("sg-agent", f"sg-agent@{PROJECT}.iam", f"sg-agent@{PROJECT}.iam.gserviceaccount.com")
     check("sg-ingestion", f"sg-ingestion@{PROJECT}.iam", f"sg-ingestion@{PROJECT}.iam.gserviceaccount.com")
