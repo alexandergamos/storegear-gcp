@@ -1,5 +1,6 @@
 # SMO-28 · The 22-question eval as a release gate (ADR-018). Run by hand before an agent or prompt release:
-# it costs about $0.25 per run, so the "eval" environment asks Alexander to approve it.
+# it costs about $0.25 per run, so it only runs when started by hand, from main (the "eval" environment allows main only;
+# required reviewers aren't available on this GitHub plan, and Alexander is the repository's only collaborator).
 # Questions that failed because Google's endpoint did are run once more; a wrong answer is never retried.
 name: eval gate
 

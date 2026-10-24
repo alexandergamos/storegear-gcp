@@ -335,10 +335,10 @@ gcloud iam service-accounts add-iam-policy-binding sg-ops@$PROJECT.iam.gservicea
 echo "$POOL/providers/storegear-gcp"
 ```
 
-**On GitHub** (repository → Settings):
-- **Environments:** `production` (deployment branches: `main` only), `eval` (required reviewer: Alexander), `ops`.
-- **Variables → Repository:** `GCP_WIF_PROVIDER` = the value printed in step 5.
-- **Variables → environment `eval`:** `GOOGLE_CLOUD_LOCATION`, `STOREGEAR_MODEL`, `STOREGEAR_THINKING`, with the values in `agent/storegear/.env` (none of them is a secret).
+**On GitHub** (done 2026-10-24 with `gh`):
+- **Environments:** `production` and `eval` accept deployments from `main` only; `ops` has no rule. Required reviewers on `eval` aren't available on a private repo on this plan (HTTP 422): only Alexander, the sole collaborator, can start it.
+- **Repository variable:** `GCP_WIF_PROVIDER` = `projects/1066603052728/locations/global/workloadIdentityPools/github/providers/storegear-gcp` (the value step 5 prints).
+- **Variables of the `eval` environment:** `GOOGLE_CLOUD_LOCATION`, `STOREGEAR_MODEL`, `STOREGEAR_THINKING`, copied from `agent/storegear/.env` (none of them is a secret).
 
 **Checks:** a push to any branch runs `ci`; merging to `main` runs `deploy sg-api` (the log prints the image size: v6 was ~126 MB compressed); Actions → `eval gate` → Run workflow asks for approval, then runs the 22 questions; Actions → `retention audit` → Run workflow.
 
