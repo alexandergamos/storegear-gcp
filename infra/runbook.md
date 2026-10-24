@@ -291,3 +291,55 @@ uv run --env-file agent/storegear/.env python eval/session_tests.py     # regres
 ```
 **Vote retention:** once the SMO-29 report is written, export the vote summary, then in Cloud SQL Studio:
 `DELETE FROM compare_votes; DELETE FROM compare_conversations;` (votes are tied to a uid; ADR-017).
+
+## SMO-28 · CI/CD with keyless deploys (2026-10-24; ADR-018)
+Alexander runs these once, in order. They create the GitHub federation, two new narrow accounts and their roles. No key is created at any step.
+
+```bash
+PROJECT=storegear-prod-ag26
+PN=$(gcloud projects describe $PROJECT --format='value(projectNumber)')
+REPO=alexandergamos/storegear-gcp
+POOL=projects/$PN/locations/global/workloadIdentityPools/github
+
+# 1. The federation: GitHub's OIDC tokens are trusted only when they come from this repository
+gcloud iam workload-identity-pools create github --project=$PROJECT --location=global --display-name="GitHub Actions"
+gcloud iam workload-identity-pools providers create-oidc storegear-gcp --project=$PROJECT --location=global \
+  --workload-identity-pool=github --display-name="storegear-gcp repo" \
+  --issuer-uri="https://token.actions.githubusercontent.com" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.environment=assertion.environment" \
+  --attribute-condition="assertion.repository == '$REPO'"
+
+# 2. sg-deploy: pushes sg-api images and deploys sg-api revisions, nothing else
+gcloud iam service-accounts create sg-deploy --project=$PROJECT --display-name="CI deploys of sg-api (GitHub Actions)"
+gcloud artifacts repositories add-iam-policy-binding storegear --project=$PROJECT --location=europe \
+  --member=serviceAccount:sg-deploy@$PROJECT.iam.gserviceaccount.com --role=roles/artifactregistry.writer
+gcloud run services add-iam-policy-binding sg-api --project=$PROJECT --region=europe-west1 \
+  --member=serviceAccount:sg-deploy@$PROJECT.iam.gserviceaccount.com --role=roles/run.developer
+gcloud iam service-accounts add-iam-policy-binding sg-api@$PROJECT.iam.gserviceaccount.com --project=$PROJECT \
+  --member=serviceAccount:sg-deploy@$PROJECT.iam.gserviceaccount.com --role=roles/iam.serviceAccountUser
+
+# 3. sg-ops: the weekly retention audit; Agent Sessions only
+gcloud iam service-accounts create sg-ops --project=$PROJECT --display-name="Weekly retention audit (GitHub Actions)"
+gcloud projects add-iam-policy-binding $PROJECT \
+  --member=serviceAccount:sg-ops@$PROJECT.iam.gserviceaccount.com --role=roles/aiplatform.user
+
+# 4. Who may become each account: one GitHub environment each (the job's "environment:" line)
+gcloud iam service-accounts add-iam-policy-binding sg-deploy@$PROJECT.iam.gserviceaccount.com --project=$PROJECT \
+  --role=roles/iam.workloadIdentityUser --member="principal://iam.googleapis.com/$POOL/subject/repo:$REPO:environment:production"
+gcloud iam service-accounts add-iam-policy-binding sg-agent@$PROJECT.iam.gserviceaccount.com --project=$PROJECT \
+  --role=roles/iam.workloadIdentityUser --member="principal://iam.googleapis.com/$POOL/subject/repo:$REPO:environment:eval"
+gcloud iam service-accounts add-iam-policy-binding sg-ops@$PROJECT.iam.gserviceaccount.com --project=$PROJECT \
+  --role=roles/iam.workloadIdentityUser --member="principal://iam.googleapis.com/$POOL/subject/repo:$REPO:environment:ops"
+
+# 5. The value GitHub needs (repository variable GCP_WIF_PROVIDER)
+echo "$POOL/providers/storegear-gcp"
+```
+
+**On GitHub** (done 2026-10-24 with `gh`):
+- **Environments:** `production` and `eval` accept deployments from `main` only; `ops` has no rule. Required reviewers on `eval` aren't available on a private repo on this plan (HTTP 422): only Alexander, the sole collaborator, can start it.
+- **Repository variable:** `GCP_WIF_PROVIDER` = `projects/1066603052728/locations/global/workloadIdentityPools/github/providers/storegear-gcp` (the value step 5 prints).
+- **Variables of the `eval` environment:** `GOOGLE_CLOUD_LOCATION`, `STOREGEAR_MODEL`, `STOREGEAR_THINKING`, copied from `agent/storegear/.env` (none of them is a secret).
+
+**Checks:** a push to any branch runs `ci`; merging to `main` runs `deploy sg-api` (the log prints the image size: v6 was ~126 MB compressed); Actions → `eval gate` → Run workflow asks for approval, then runs the 22 questions; Actions → `retention audit` → Run workflow.
+
+**Later, not now:** the default Compute account keeps Editor until the ingestion worker image also builds in CI (it is still built with `gcloud builds submit`, which uses that account). Removing it earlier would break that build.

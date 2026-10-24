@@ -1,0 +1,31 @@
+# SMO-28 · The 30-day retention audit (ADR-016), weekly. The TTL is the mechanism; this is the proof.
+# Runs as sg-ops, which can only manage Agent Sessions.
+name: retention audit
+
+on:
+  schedule:
+    - cron: "0 5 * * 1"   # Mondays 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    environment: ops
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Sign in to Google Cloud as sg-ops (no keys)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: sg-ops@storegear-prod-ag26.iam.gserviceaccount.com
+      - name: Delete sessions older than 30 days and cap longer expiries
+        run: uv run python infra/sessions_retention.py

@@ -152,7 +152,7 @@ def build_context(run: dict, question: str) -> str:
     return "\n\n".join(parts)[:80000] or "(vacio: el asistente no hizo ninguna busqueda)"
 
 
-def main(only: list[int]) -> None:
+def main(only: list[int], out_path: str | None = None) -> None:
     corr_prompt, triad_prompt = load_prompt("correctness.md"), load_prompt("rag_triad.md")
     qs = json.load(open(ROOT / "eval" / "dataset.json", encoding="utf-8"))
     if only:
@@ -185,16 +185,17 @@ def main(only: list[int]) -> None:
     low = [r for r in results if any(isinstance(r[k], int) and r[k] < 5 for k in ("correctness", "faithfulness", "context_relevance", "answer_relevance"))]
     for r in low:
         print(f"  <5 Q{r['qid']}: {r['correctness_reason'][:140] if r['correctness'] != 5 else r['triad_reason'][:140]}")
-    out = ROOT / "eval" / "results" / f"{datetime.now():%Y%m%d-%H%M}.json"
+    out = Path(out_path).resolve() if out_path else ROOT / "eval" / "results" / f"{datetime.now():%Y%m%d-%H%M}.json"
     out.parent.mkdir(exist_ok=True)
     json.dump({"summary": summary, "results": results}, open(out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    print(f"\nsaved {out.relative_to(ROOT)}")
+    print(f"\nsaved {out}")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", type=int, nargs="*", default=[])
     ap.add_argument("--remote", action="store_true", help="evaluate the agent deployed on Agent Runtime")
+    ap.add_argument("--out", help="where to write the results JSON (the CI gate reads it, SMO-28)")
     args = ap.parse_args()
     if args.remote:
         import warnings
@@ -203,4 +204,4 @@ if __name__ == "__main__":
         st = json.loads((ROOT / "infra" / "agent_runtime.json").read_text())
         REMOTE = vertexai.Client(project="storegear-prod-ag26", location=st["location"]).agent_engines.get(name=st["resource_name"])
         print("evaluating DEPLOYED agent:", st["resource_name"])
-    main(args.only)
+    main(args.only, args.out)

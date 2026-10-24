@@ -1,0 +1,24 @@
+# SMO-28 · Tests on every push and pull request (ADR-018). No cloud credentials: everything runs on fakes.
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_call:   # the deploy workflow runs the same tests first
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install (the same versions as uv.lock)
+        run: uv sync --frozen
+      - name: Unit tests (sg-api, infra, eval gate)
+        run: uv run pytest api/tests infra/tests eval/tests -q

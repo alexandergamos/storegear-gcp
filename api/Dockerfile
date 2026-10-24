@@ -4,7 +4,8 @@ FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:0.9.5 /uv /bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+# only the "api" group (ADR-018): no ADK, Document AI, numpy or pypdf in this image
+RUN uv sync --frozen --no-default-groups --group api --no-install-project
 COPY api/ api/
 COPY agent/storegear/prompts/system_es.md api/system_es.md
 ENV PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
