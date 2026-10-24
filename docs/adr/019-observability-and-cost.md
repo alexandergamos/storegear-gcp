@@ -1,6 +1,6 @@
 # ADR-019 — Observability and cost per answer: Google's own traces, one log line per answer, priced from its tokens
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-24, Alexander: option A)
 - **Date:** 2026-10-24
 - **Linear:** SMO-25 (tracing), SMO-26 (cost per answer)
 - **Deciders:** Alexander (decides) · Claude (drafts)
@@ -23,13 +23,13 @@ Constraints:
 | B. Langfuse for Google Cloud too (OpenTelemetry exporter) | The same tool for both builds: a side-by-side comparison in one screen; an LLM-made UI with cost built in | Answers' metadata leave Google Cloud for a third party; ADK sends prompt text unless every exporter is configured not to; one more service and secret to run; works against "Google Cloud end to end" | Langfuse Hobby: free up to its limits |
 | C. Billing export only | No code: Google's own invoice, by service | No per-answer number, no latency or step view, no alerts per question: it answers "how much this month", not "what did this answer cost and why" | Cents |
 
-## Decision (proposed)
+## Decision
 **A**, in four pieces:
 
 1. **Traces of the agent (SMO-25).** Redeploy the agent with Agent Runtime telemetry on and message content capture **off**, so Cloud Trace shows each answer's model calls, tool calls (`buscar_catalogo_hibrido`, `consultar_precio_stock`), latency and tokens, with no text. Checked by opening one trace and confirming it holds no prompt or answer.
-2. **One `ANSWER` line per answer in `sg-api` (SMO-25 + SMO-26):** `event`, `agent` (gcp / n8n), conversation id, a hash of the user id (not the id), role, steps with their times, guard outcome, `tokens_in`, `tokens_out`, model, `release` (the commit the CI deployed, passed as an environment variable), `cost_usd` (estimate). Never the question or the answer. A unit test fails if a question's text appears in the line.
-3. **Cost per answer (SMO-26):** `cost_usd` = model tokens × the Gemini 3.8 Flash list price + the topic check's tokens + one Model Armor call + one query embedding, from a price table in the code with its source and date. A weekly report (`eval/cost_report.py`) reads the `ANSWER` lines and the BigQuery billing export and prints both: estimated vs billed, per answer and per service. If they differ by more than 15 %, the price table is wrong and gets fixed.
-4. **Dashboard and alerts:** log-based metrics for answers, failures and cost; a Cloud Monitoring dashboard (answers per day, p50/p95 latency, failure rate, cost per answer and per day); an email alert when the failure rate passes 10 % in an hour or the daily cost passes $2.
+2. **One `ANSWER` line per answer in `sg-api` (SMO-25 + SMO-26):** `event`, `agent` (gcp / n8n), conversation id, a 16-character hash of the user id (not the id), role, steps with their times, `total_ms`, guard outcome, `tokens_in` / `tokens_cached` / `tokens_out` / `model_calls` (summed from Agent Runtime's `usage_metadata`), model, `release` (the commit the CI deployed, `STOREGEAR_RELEASE`), `cost_eur` and `cost_usd`. Never the question or the answer: a unit test fails if either appears in the line (`api/tests/test_answer_log.py`).
+3. **Cost per answer (SMO-26):** `api/cost.py` prices fresh input, cached input and output tokens (thinking counts as output) plus the topic check, at the rates **this project is billed**, read from the billing export (EUR, 2026-10-24: Gemini 3.8 Flash Regional EU €1.452 / €0.145 cached / €7.26 per million tokens). Model Armor doesn't appear in the bill (free allowance) and a query embedding is ~€0.000004, so both are left out. `eval/cost_report.py` compares the sum of `cost_eur` with the billed Gemini SKUs over a period; more than 15 % apart means the table is wrong. The bill also holds eval runs, so compare weeks without evals.
+4. **Dashboard and alerts** (`infra/monitoring/`): log-based metrics `sg_answers`, `sg_answer_latency_ms`, `sg_answer_cost_eur`, `sg_agent_failures`; a Cloud Monitoring dashboard (answers and failures per hour by agent, p50/p95 latency, median cost per answer, guardrail stops by reason); an email alert at 3+ failed answers in an hour. At this volume a fixed count is clearer than a rate. Spending is already capped and alerted by the project budget (ADR-001), so no second cost alert.
 
 ## Consequences
 - **Good:** the monitoring gap in the rubric closes with Google's own tools; every answer can be traced and priced; the threat-model items LLM02 (no PII in traces) and LLM10 (cost + alerts) close; the release in each line ties an answer to its commit.

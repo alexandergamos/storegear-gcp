@@ -1,0 +1,18 @@
+# SMO-25 (ADR-019) · total time of each answer, as seen by sg-api
+name: sg_answer_latency_ms
+description: Time to answer (ms) per ANSWER line, by agent
+filter: resource.type="cloud_run_revision" AND resource.labels.service_name="sg-api" AND jsonPayload.event="ANSWER"
+valueExtractor: EXTRACT(jsonPayload.total_ms)
+labelExtractors:
+  agent: EXTRACT(jsonPayload.agent)
+bucketOptions:
+  exponentialBuckets:
+    numFiniteBuckets: 40
+    growthFactor: 1.25
+    scale: 100
+metricDescriptor:
+  metricKind: DELTA
+  valueType: DISTRIBUTION
+  unit: ms
+  labels:
+  - key: agent

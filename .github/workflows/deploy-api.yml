@@ -57,7 +57,8 @@ jobs:
           echo "TAG=$TAG" >> "$GITHUB_ENV"
 
       - name: Deploy a candidate revision with no traffic
-        run: gcloud run deploy "$SERVICE" --image "$IMAGE:$TAG" --region "$REGION" --no-traffic --tag candidate --quiet
+        # STOREGEAR_RELEASE goes into every ANSWER log line (ADR-019): each answer says which commit produced it
+        run: gcloud run deploy "$SERVICE" --image "$IMAGE:$TAG" --region "$REGION" --no-traffic --tag candidate --update-env-vars "STOREGEAR_RELEASE=$TAG" --quiet
 
       - name: Smoke checks against the candidate
         run: |
