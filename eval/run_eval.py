@@ -51,6 +51,7 @@ from google import genai  # noqa: E402
 from google.adk.runners import InMemoryRunner  # noqa: E402
 from google.genai import types  # noqa: E402
 
+from gate import mean_scored  # noqa: E402  (eval/ is on the path: this file runs as a script)
 from storegear import agent as sg  # noqa: E402
 
 BASELINE = {"correctness": 5.00, "faithfulness": 4.95, "context_relevance": 5.00, "answer_relevance": 5.00, "median_s": 9.0}
@@ -172,7 +173,7 @@ def main(only: list[int], out_path: str | None = None) -> None:
         print(f"Q{q['qid']:<3} C{row['correctness']} F{row['faithfulness']} X{row['context_relevance']} A{row['answer_relevance']} "
               f"{run['latency_s']:5.1f}s searches+{run['extra_searches']}  {q['category']}")
 
-    mean = lambda k: round(statistics.mean(r[k] for r in results if isinstance(r[k], int)), 2)  # noqa: E731
+    mean = lambda k: mean_scored(results, k)  # noqa: E731  None when the judge scored nothing: the gate says so
     summary = {"correctness": mean("correctness"), "faithfulness": mean("faithfulness"),
                "context_relevance": mean("context_relevance"), "answer_relevance": mean("answer_relevance"),
                "median_s": round(statistics.median(r["latency_s"] for r in results), 1),
@@ -180,7 +181,7 @@ def main(only: list[int], out_path: str | None = None) -> None:
                "tokens_out_avg": round(statistics.mean(r["tokens_out"] for r in results)), "n": len(results)}
     print("\n             Google Cloud   n8n baseline")
     for k in ("correctness", "faithfulness", "context_relevance", "answer_relevance", "median_s"):
-        print(f"  {k:18} {summary[k]:>6}        {BASELINE[k]}")
+        print(f"  {k:18} {'-' if summary[k] is None else summary[k]:>6}        {BASELINE[k]}")
     print(f"  tokens per answer: {summary['tokens_in_avg']} in / {summary['tokens_out_avg']} out")
     low = [r for r in results if any(isinstance(r[k], int) and r[k] < 5 for k in ("correctness", "faithfulness", "context_relevance", "answer_relevance"))]
     for r in low:
