@@ -194,7 +194,7 @@ uv run python infra/sql/apply.py infra/sql/003_swap_catalog_v2.sql    # one tran
 ```bash
 # Console: enable Model Armor API; template sg-ingestion-pi (eu, PI + jailbreak only, low and above) kept for Phase 3/4
 uv run python infra/sql/apply.py infra/sql/004_quarantine.sql
-uv run python eval/injection_benchmark.py build && uv run python eval/injection_benchmark.py run regex gemini armor
+uv run python eval/injection_benchmark.py build && uv run python eval/injection_benchmark.py run regex   # gemini/armor refused: no attack payloads to live models
 PYTHONPATH=ingestion uv run python ingestion/check_catalog.py            # after chunk_manuals, before embed/load
 PYTHONPATH=ingestion uv run python ingestion/check_catalog.py --apply    # record flags + remove them from the live catalog
 # Review (as Alexander): UPDATE catalog_quarantine SET status='approved', reviewed_at=now() WHERE parent_id='...';
@@ -257,7 +257,7 @@ uv run --env-file agent/storegear/.env python eval/auth_tests.py   # 7/7
 gcloud builds submit --config api/cloudbuild.yaml --substitutions=_TAG=v3
 gcloud run deploy sg-api --image europe-docker.pkg.dev/storegear-prod-ag26/storegear/sg-api:v3 --region europe-west1
 uv run python infra/deploy_agent_runtime.py --update          # explicit safety settings + file_id validation
-uv run --env-file agent/storegear/.env python eval/guardrail_tests.py --eval   # 10/10
+uv run --env-file agent/storegear/.env python eval/guardrail_tests.py --eval   # shop questions only; jailbreak, probe and explicit cases run with fakes (api/tests)
 uv run python eval/run_eval.py --remote
 ```
 
@@ -287,7 +287,7 @@ uv run --env-file agent/storegear/.env python eval/compare_tests.py     # n8n an
 uv run --env-file agent/storegear/.env python eval/auth_tests.py        # regression 7/7
 uv run --env-file agent/storegear/.env python eval/session_tests.py     # regression 6/6 (needs Agent Platform)
 #  jury accounts: uv run python infra/users.py add <email> staff --demo
-#  after Agent Platform access returns: guardrail_tests.py --eval; then optionally STOREGEAR_PARTIAL_EVENTS=1 (check steps live)
+#  after Agent Platform access returns: guardrail_tests.py --eval (shop questions only); then optionally STOREGEAR_PARTIAL_EVENTS=1 (check steps live)
 ```
 **Vote retention:** once the SMO-29 report is written, export the vote summary, then in Cloud SQL Studio:
 `DELETE FROM compare_votes; DELETE FROM compare_conversations;` (votes are tied to a uid; ADR-017).

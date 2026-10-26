@@ -57,7 +57,9 @@ def main() -> None:
     sid = r1["session_id"]
     r2 = call("POST", "/chat", staff, {"message": "¿Y hay stock?", "session_id": sid}).json()
     a = r2.get("answer", "")
-    check("1 follow-up keeps the context", r2.get("session_id") == sid and ("stock" in a.lower() or "unidad" in a.lower()) and "ignite" in a.lower(), repr(a[:110]))
+    # the follow-up is about the Ignite 2: it names it, or gives its row of the price sheet (229 €, 7 units)
+    about_ignite = "ignite" in a.lower() or ("229" in a and "7 unidades" in a.lower())
+    check("1 follow-up keeps the context", r2.get("session_id") == sid and ("stock" in a.lower() or "unidad" in a.lower()) and about_ignite, repr(a[:110]))
     ids = [x["session_id"] for x in call("GET", "/sessions", staff).json().get("sessions", [])]
     check("2 owner lists the session", sid in ids, f"{len(ids)} sessions")
     t0 = time.time()
