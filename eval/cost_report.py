@@ -4,12 +4,13 @@
     uv run python eval/cost_report.py --days 30
 
 Estimated: the sum of cost_eur over the Google Cloud agent's ANSWER lines (sg-api, Cloud Logging).
-Billed: the Gemini 3.8 Flash Regional SKUs of Vertex AI in the billing export (BigQuery, dataset billing_export).
+Billed: the Gemini 3.8 Flash SKUs of this project in the billing export (BigQuery, dataset billing_export), by SKU.
 The bill also holds eval runs, which don't go through sg-api, so compare weeks without evals; a gap over 15 %
 means the price table in api/cost.py is wrong.
 """
 import argparse
 import json
+import shutil
 import subprocess
 import urllib.request
 
@@ -34,22 +35,34 @@ def compare(estimated_eur: float, billed_eur: float) -> tuple[float | None, bool
     return diff, abs(diff) <= TOLERANCE_PCT
 
 
+def gcloud(*args: str) -> list[str]:
+    """The gcloud command with its full path: on Windows it is gcloud.cmd, which a bare "gcloud" doesn't find."""
+    return [shutil.which("gcloud") or "gcloud", *args]
+
+
 def _token() -> str:
-    return subprocess.run("gcloud auth print-access-token", shell=True, capture_output=True, text=True).stdout.strip()
+    return subprocess.run(gcloud("auth", "print-access-token"), capture_output=True, text=True).stdout.strip()
 
 
 def answer_lines(days: int) -> list[dict]:
     flt = ('resource.type="cloud_run_revision" AND resource.labels.service_name="sg-api" '
            f'AND jsonPayload.event="ANSWER" AND timestamp>="-P{days}D"')
-    out = subprocess.run(["gcloud", "logging", "read", flt, f"--project={PROJECT}", "--format=json", "--limit=100000",
-                          f"--freshness={days}d"], capture_output=True, text=True, shell=False).stdout
+    out = subprocess.run(gcloud("logging", "read", flt, f"--project={PROJECT}", "--format=json", "--limit=100000",
+                                f"--freshness={days}d"), capture_output=True, text=True).stdout
     return [e["jsonPayload"] for e in json.loads(out or "[]") if "jsonPayload" in e]
 
 
-def billed_eur(days: int) -> float:
-    q = f"""SELECT IFNULL(SUM(cost), 0) FROM `{BILLING_TABLE}`
-            WHERE service.description = 'Vertex AI' AND sku.description LIKE 'Gemini 3.8 Flash Regional%'
+def billed_query(days: int) -> str:
+    """Gemini 3.8 Flash in this project, matched by SKU: Google renamed the service ("Vertex AI" is now billed as
+    "Agent Platform Model Garden"). Gross cost, like the estimate; the API-key billing (n8n's side) is left out."""
+    return f"""SELECT IFNULL(SUM(cost), 0) FROM `{BILLING_TABLE}`
+            WHERE project.id = '{PROJECT}' AND sku.description LIKE '%Gemini 3.8 Flash%'
+              AND service.description NOT LIKE 'Gemini API%'
               AND usage_start_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {days} DAY)"""
+
+
+def billed_eur(days: int) -> float:
+    q = billed_query(days)
     req = urllib.request.Request(f"https://bigquery.googleapis.com/bigquery/v2/projects/{PROJECT}/queries",
                                  data=json.dumps({"query": q, "useLegacySql": False}).encode(),
                                  headers={"Authorization": f"Bearer {_token()}", "Content-Type": "application/json"})
