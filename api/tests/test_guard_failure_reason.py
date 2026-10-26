@@ -34,13 +34,34 @@ def test_model_armor_down_names_the_guard_and_the_http_code(monkeypatch):
     assert end["reason"] == "armor_in: HTTPError 403"
 
 
-def test_topic_check_down_names_the_guard(monkeypatch):
+def test_topic_check_down_lets_the_question_through_and_says_why(monkeypatch):
+    # the topic check is a scope filter, not a safety control (ADR-015 addendum): when Gemini is too slow to answer it,
+    # the question goes on to the agent, whose prompt keeps it to the catalogue, and the answer records the skip
     monkeypatch.setattr(guards, "armor", lambda text, response=False: [])
     def slow(text):
         raise TimeoutError()
     monkeypatch.setattr(guards, "on_topic", slow)
     end = run(FakeRemote(PRICE_EVENTS))[-1]
-    assert end["message"] == "guardrail unavailable" and end["reason"] == "topic_check: TimeoutError"
+    assert end["type"] == "answer" and end["text"] == "El Venu X1 cuesta 549 € y hay 3 en stock."
+    assert end["topic_skipped"] == "topic_check: TimeoutError" and end["topic_check"] is False
+
+
+def test_a_checked_topic_records_no_skip(monkeypatch):
+    monkeypatch.setattr(guards, "armor", lambda text, response=False: [])
+    monkeypatch.setattr(guards, "on_topic", lambda text: True)
+    end = run(FakeRemote(PRICE_EVENTS))[-1]
+    assert end["type"] == "answer" and "topic_skipped" not in end and end["topic_check"] is True
+
+
+def test_the_answer_line_says_the_topic_check_was_skipped(monkeypatch, caplog):
+    monkeypatch.setattr(guards, "armor", lambda text, response=False: [])
+    def slow(text):
+        raise TimeoutError()
+    monkeypatch.setattr(guards, "on_topic", slow)
+    with caplog.at_level(logging.WARNING, logger="sg-api"):
+        list(main.watched("gcp", run(FakeRemote(PRICE_EVENTS)), "u1", None, "staff"))
+    [line] = [json.loads(r.getMessage()) for r in caplog.records if r.name == "sg-api"]
+    assert line["event"] == "ANSWER" and line["topic_skipped"] == "topic_check: TimeoutError"
 
 
 def test_output_armor_down_names_the_guard(monkeypatch):

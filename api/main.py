@@ -199,6 +199,7 @@ def log_answer(agent: str, uid: str, role: str | None, conversation_id: str | No
         "tokens_in": u["tokens_in"], "tokens_cached": u["tokens_cached"], "tokens_out": u["tokens_out"], "model_calls": u["model_calls"],
         "model": MODEL if agent == "gcp" else None, "release": RELEASE,
         "cost_eur": round(price["eur"], 7) if price else None, "cost_usd": round(price["usd"], 7) if price else None,
+        **({"topic_skipped": end["topic_skipped"]} if end.get("topic_skipped") else {}),
     }, ensure_ascii=False))
 
 
