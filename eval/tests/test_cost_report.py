@@ -1,4 +1,8 @@
 """SMO-26 · the weekly cost report: estimated (ANSWER lines) vs billed (billing export)."""
+import subprocess
+
+import pytest
+
 import cost_report
 
 
@@ -45,3 +49,28 @@ def test_the_bill_is_matched_by_sku_whatever_the_service_is_called():
     q = cost_report.billed_query(7)
     assert "'Vertex AI'" not in q and "Gemini 3.8 Flash" in q
     assert "project.id = 'storegear-prod-ag26'" in q and "Gemini API" in q   # this project only, not the API-key billing
+
+
+def fake_run(monkeypatch, returncode, stdout="", stderr=""):
+    seen = {}
+
+    def run(cmd, **kw):
+        seen["cmd"] = cmd
+        return subprocess.CompletedProcess(cmd, returncode, stdout, stderr)
+    monkeypatch.setattr(cost_report.subprocess, "run", run)
+    return seen
+
+
+def test_the_log_filter_is_one_cloud_logging_accepts(monkeypatch):
+    # "-P7D" is not a timestamp: Cloud Logging rejects the whole filter (INVALID_ARGUMENT); --freshness bounds the days
+    seen = fake_run(monkeypatch, 0, stdout="[]")
+    cost_report.answer_lines(7)
+    flt = next(a for a in seen["cmd"] if "jsonPayload.event" in a)
+    assert "timestamp" not in flt and "--freshness=7d" in seen["cmd"]
+
+
+def test_a_failed_log_read_stops_the_report_instead_of_counting_zero(monkeypatch):
+    fake_run(monkeypatch, 1, stderr="ERROR: (gcloud.logging.read) INVALID_ARGUMENT")
+    with pytest.raises(SystemExit) as e:
+        cost_report.answer_lines(7)
+    assert "INVALID_ARGUMENT" in str(e.value)
