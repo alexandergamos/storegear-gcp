@@ -14,6 +14,7 @@ permissions:
 jobs:
   eval:
     runs-on: ubuntu-latest
+    timeout-minutes: 45   # 22 questions take ~15-20 min; a hung call has its own deadline, this is the last guard
     environment: eval
     env:
       # the same non-secret settings as agent/storegear/.env (set as variables of the "eval" environment)
@@ -23,6 +24,7 @@ jobs:
       STOREGEAR_MODEL: ${{ vars.STOREGEAR_MODEL }}
       STOREGEAR_THINKING: ${{ vars.STOREGEAR_THINKING }}
       PYTHONIOENCODING: utf-8
+      PYTHONUNBUFFERED: "1"   # each question's line shows in the live log as it finishes
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
