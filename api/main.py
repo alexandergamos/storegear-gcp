@@ -209,7 +209,7 @@ def watched(agent: str, events, uid: str, conversation_id: str | None, role: str
     try:
         for e in events:
             if e["type"] == "error":
-                log_failure(agent, uid, conversation_id, e["message"])
+                log_failure(agent, uid, conversation_id, f"{e['message']} ({e['reason']})" if e.get("reason") else e["message"])
             elif e["type"] == "step" and e.get("status") == "done":
                 steps.append({"label": e["label"], "ms": e.get("ms")})
             elif e["type"] == "answer":

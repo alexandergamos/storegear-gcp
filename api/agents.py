@@ -82,8 +82,18 @@ class _Steps:
         self.current = None
 
 
-def _error(status: int, message: str) -> dict:
-    return {"type": "error", "status": status, "message": message}
+def _error(status: int, message: str, reason: str | None = None) -> dict:
+    """`message` may reach the client (/chat); `reason` is for our log only."""
+    e = {"type": "error", "status": status, "message": message}
+    if reason:
+        e["reason"] = reason
+    return e
+
+
+def _why(guard: str, ex: Exception) -> str:
+    """Which guard failed and how, for the log: the error kind and its HTTP code, never its text (it may echo input)."""
+    code = getattr(getattr(ex, "response", None), "status_code", None) or getattr(ex, "code", None)
+    return f"{guard}: {type(ex).__name__}" + (f" {code}" if isinstance(code, int) else "")
 
 
 def add_usage(total: dict | None, um: dict | None) -> dict | None:
@@ -110,8 +120,8 @@ def gcp_events(get_remote: Callable, uid: str, role: str, message: str, session_
     # never reach the model, not even for classification.
     try:
         hits = guards.armor(message)
-    except Exception:  # noqa: BLE001  fail closed: an unchecked question never reaches the agent
-        yield _error(503, "guardrail unavailable")
+    except Exception as ex:  # noqa: BLE001  fail closed: an unchecked question never reaches the agent
+        yield _error(503, "guardrail unavailable", _why("armor_in", ex))
         return
     if hits:
         yield from steps.finish()
@@ -120,8 +130,8 @@ def gcp_events(get_remote: Callable, uid: str, role: str, message: str, session_
         return
     try:
         topic_ok = guards.on_topic(message)
-    except Exception:  # noqa: BLE001
-        yield _error(503, "guardrail unavailable")
+    except Exception as ex:  # noqa: BLE001
+        yield _error(503, "guardrail unavailable", _why("topic_check", ex))
         return
     if not topic_ok:
         yield from steps.finish()
@@ -174,8 +184,8 @@ def gcp_events(get_remote: Callable, uid: str, role: str, message: str, session_
     text, pii_out = guards.mask_pii(text)
     try:
         hits_out = guards.armor(text, response=True)
-    except Exception:  # noqa: BLE001
-        yield _error(503, "guardrail unavailable")
+    except Exception as ex:  # noqa: BLE001
+        yield _error(503, "guardrail unavailable", _why("armor_out", ex))
         return
     yield from steps.finish()
     if hits_out:
