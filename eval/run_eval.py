@@ -24,6 +24,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from deadline import TIMEOUT_ANSWER, within
+
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / "agent" / "storegear" / ".env")
 sys.path.insert(0, str(ROOT / "agent"))
@@ -76,12 +78,17 @@ def load_prompt(name: str) -> str:
     return text
 
 
+AGENT_DEADLINE_S = 180   # per question, the deployed agent; a hung stream_query must not hang the gate
+JUDGE_DEADLINE_S = 90    # per judge call (its HTTP timeout is 60 s; this also covers a stuck connection)
+
+
 def ask_judge(prompt: str, schema: dict) -> dict:
     for attempt in range(4):
         try:
-            r = judge.models.generate_content(
+            r = within(lambda: judge.models.generate_content(
                 model=JUDGE_MODEL, contents=prompt,
-                config=types.GenerateContentConfig(temperature=0, response_mime_type="application/json", response_schema=schema))
+                config=types.GenerateContentConfig(temperature=0, response_mime_type="application/json", response_schema=schema,
+                                                   http_options=types.HttpOptions(timeout=60_000))), JUDGE_DEADLINE_S)
             return json.loads(r.text)
         except Exception as e:  # noqa: BLE001
             if attempt == 3:
@@ -117,6 +124,15 @@ REMOTE = None  # Agent Runtime handle when --remote
 
 
 def run_agent_remote(question: str) -> dict:
+    """run_agent_remote_once with a deadline: no answer in AGENT_DEADLINE_S is an availability failure (retried once)."""
+    try:
+        return within(lambda: run_agent_remote_once(question), AGENT_DEADLINE_S)
+    except TimeoutError:
+        return {"answer": TIMEOUT_ANSWER, "latency_s": float(AGENT_DEADLINE_S), "tool_calls": 0, "extra_searches": 0,
+                "pre_retrieval": "", "searches": [], "tokens_in": 0, "tokens_out": 0}
+
+
+def run_agent_remote_once(question: str) -> dict:
     """Same record as run_agent, from the DEPLOYED agent. Pre-retrieval runs inside the cloud process, so it is
     recomputed here with the same search, DB and question (deterministic) to show the judge what the model saw."""
     session = REMOTE.create_session(user_id="eval", state={"user:role": "staff"}, ttl="86400s")   # test data: 1 day (ADR-016)
