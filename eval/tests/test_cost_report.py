@@ -32,3 +32,16 @@ def test_beyond_15_percent_the_price_table_is_wrong():
 
 def test_nothing_billed_cannot_be_compared():
     assert cost_report.compare(estimated_eur=0.5, billed_eur=0.0) == (None, False)
+
+
+def test_gcloud_is_found_on_windows_too(monkeypatch):
+    # on Windows gcloud is gcloud.cmd: a bare "gcloud" in subprocess.run is not found (WinError 2)
+    monkeypatch.setattr(cost_report.shutil, "which", lambda name: r"C:\SDK\bin\gcloud.cmd" if name == "gcloud" else None)
+    assert cost_report.gcloud("logging", "read")[:3] == [r"C:\SDK\bin\gcloud.cmd", "logging", "read"]
+
+
+def test_the_bill_is_matched_by_sku_whatever_the_service_is_called():
+    # the console bills Gemini under "Agent Platform Model Garden" now, not "Vertex AI"
+    q = cost_report.billed_query(7)
+    assert "'Vertex AI'" not in q and "Gemini 3.8 Flash" in q
+    assert "project.id = 'storegear-prod-ag26'" in q and "Gemini API" in q   # this project only, not the API-key billing
