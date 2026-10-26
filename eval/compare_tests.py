@@ -9,7 +9,7 @@
  5  the n8n slot answers (known only after reveal); the Google slot answers once Agent Platform access is back
  6  vote once -> ok (or 409 if a slot failed); a second vote -> 409
  7  reveal -> mapping for A and B with the question's totals; after reveal, /compare on it -> 409
- 8  /chat/stream: steps with times, then an answer (or the fixed error while Agent Platform is restricted)
+ 8  /chat/stream: steps with times, then an answer (the fixed error passes only while /status says restricted)
 """
 import json
 import os
@@ -90,9 +90,10 @@ def main() -> None:
     sev = events(s) if s.ok else []
     timed = [d for e, d in sev if e == "step" and d.get("status") == "done"]
     end = sev[-1] if sev else ("none", {})
-    # while restricted the topic check (Gemini) fails before any step is done: only the fixed error is expected then
+    # while restricted the topic check (Gemini) fails before any step is done: only then is the fixed error expected
+    restricted = requests.get(f"{API}/status", timeout=30).json().get("gcp") == "restricted"
     ok = (end[0] == "answer" and bool(timed) and all(isinstance(d.get("ms"), int) for d in timed)) or \
-         (end[0] == "error" and end[1].get("message") == FAILED)
+         (restricted and end[0] == "error" and end[1].get("message") == FAILED)
     check("8 /chat/stream steps with times", ok, f"{[d['label'] for d in timed]} · {end[0]}")
     print(f"\n{sum(results)}/{len(results)} passed")
     sys.exit(0 if all(results) else 1)
