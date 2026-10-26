@@ -45,11 +45,13 @@ def _token() -> str:
 
 
 def answer_lines(days: int) -> list[dict]:
-    flt = ('resource.type="cloud_run_revision" AND resource.labels.service_name="sg-api" '
-           f'AND jsonPayload.event="ANSWER" AND timestamp>="-P{days}D"')
-    out = subprocess.run(gcloud("logging", "read", flt, f"--project={PROJECT}", "--format=json", "--limit=100000",
-                                f"--freshness={days}d"), capture_output=True, text=True).stdout
-    return [e["jsonPayload"] for e in json.loads(out or "[]") if "jsonPayload" in e]
+    # the days are bounded by --freshness: Cloud Logging rejects a relative "-P7D" inside the filter
+    flt = 'resource.type="cloud_run_revision" AND resource.labels.service_name="sg-api" AND jsonPayload.event="ANSWER"'
+    r = subprocess.run(gcloud("logging", "read", flt, f"--project={PROJECT}", "--format=json", "--limit=100000",
+                              f"--freshness={days}d"), capture_output=True, text=True)
+    if r.returncode != 0:   # a failed read must stop the report, never show up as "0 answers"
+        raise SystemExit(f"gcloud logging read failed: {r.stderr.strip()[:300]}")
+    return [e["jsonPayload"] for e in json.loads(r.stdout or "[]") if "jsonPayload" in e]
 
 
 def billed_query(days: int) -> str:
