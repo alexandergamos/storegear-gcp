@@ -128,11 +128,14 @@ def gcp_events(get_remote: Callable, uid: str, role: str, message: str, session_
         yield {"type": "answer", "text": REPLY["blocked"], "session_id": session_id, "guard": {"blocked": "input", "filters": hits},
                "usage": None, "topic_check": False}
         return
+    # The topic check is a scope filter, not a safety control (ADR-015 addendum, 2026-10-26): when Gemini is too slow
+    # to answer it, the question goes on (the agent's prompt keeps it to the catalogue) and the answer records why.
+    # Model Armor above and the output guards below still fail closed.
+    topic_checked, skipped = True, {}
     try:
         topic_ok = guards.on_topic(message)
     except Exception as ex:  # noqa: BLE001
-        yield _error(503, "guardrail unavailable", _why("topic_check", ex))
-        return
+        topic_ok, topic_checked, skipped = True, False, {"topic_skipped": _why("topic_check", ex)}
     if not topic_ok:
         yield from steps.finish()
         yield {"type": "answer", "text": REPLY["off_topic"], "session_id": session_id, "guard": {"blocked": "off_topic"},
@@ -178,7 +181,7 @@ def gcp_events(get_remote: Callable, uid: str, role: str, message: str, session_
     if found_leak:
         yield from steps.finish()
         yield {"type": "answer", "text": REPLY["leak"], "session_id": sid, "seconds": round(time.time() - t0, 1),
-               "guard": {"blocked": "leak", "leak": found_leak}, "usage": usage, "topic_check": True}
+               "guard": {"blocked": "leak", "leak": found_leak}, "usage": usage, "topic_check": topic_checked, **skipped}
         return
     text, links = guards.strip_links(text)
     text, pii_out = guards.mask_pii(text)
@@ -190,7 +193,7 @@ def gcp_events(get_remote: Callable, uid: str, role: str, message: str, session_
     yield from steps.finish()
     if hits_out:
         yield {"type": "answer", "text": REPLY["blocked"], "session_id": sid, "seconds": round(time.time() - t0, 1),
-               "guard": {"blocked": "output", "filters": hits_out}, "usage": usage, "topic_check": True}
+               "guard": {"blocked": "output", "filters": hits_out}, "usage": usage, "topic_check": topic_checked, **skipped}
         return
     yield {"type": "answer", "text": text, "session_id": sid, "seconds": round(time.time() - t0, 1),
-           "guard": {"pii_out": pii_out, "links_removed": links}, "usage": usage, "topic_check": True}
+           "guard": {"pii_out": pii_out, "links_removed": links}, "usage": usage, "topic_check": topic_checked, **skipped}

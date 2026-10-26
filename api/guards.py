@@ -108,6 +108,8 @@ Fuera del ámbito: cualquier otra cosa (recetas, tareas escolares, programación
 Si dudas, considera que está DENTRO. Responde solo con el JSON pedido.
 
 Mensaje: <mensaje>{text}</mensaje>"""
+# one try, 8 s at most: past that the question goes on without it (agents.gcp_events), never waits on a slow endpoint
+TOPIC_TIMEOUT_MS = 8000
 TOPIC_SCHEMA = types.Schema(type="OBJECT", required=["on_topic"], properties={"on_topic": types.Schema(type="BOOLEAN")})
 
 
@@ -120,7 +122,7 @@ def on_topic(text: str) -> bool:
         model=MODEL, contents=TOPIC_PROMPT.format(text=text.replace("</mensaje>", "")),
         config=types.GenerateContentConfig(temperature=0, response_mime_type="application/json", response_schema=TOPIC_SCHEMA,
                                            thinking_config=types.ThinkingConfig(thinking_level="low"),
-                                           http_options=types.HttpOptions(timeout=10000, retry_options=types.HttpRetryOptions(attempts=2))))
+                                           http_options=types.HttpOptions(timeout=TOPIC_TIMEOUT_MS, retry_options=types.HttpRetryOptions(attempts=1))))
     return bool(json.loads(r.text)["on_topic"])
 
 
