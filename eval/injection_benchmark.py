@@ -1,7 +1,10 @@
 """SMO-18 · Injection-detector bake-off on a labelled set of manual sections (ADR-010).
 
     uv run python eval/injection_benchmark.py build                 # data/injection/testset.jsonl (seeded, reproducible)
-    uv run python eval/injection_benchmark.py run regex gemini armor
+    uv run python eval/injection_benchmark.py run regex                 # offline only
+
+The attack payloads are never sent to live Google models (Generative AI Prohibited Use Policy): `run` refuses the
+gemini and armor detectors. Their measured results stay in ADR-010.
 
 Test set = real catalog sections (staff manuals only) of three kinds:
   clean      random sections
@@ -89,7 +92,13 @@ def build() -> None:
     print(f"wrote {SET.relative_to(ROOT)}: {len(clean)} clean · {len(hard)} hard negatives · {len(hosts)} attacks")
 
 
+LIVE_DETECTORS = {"gemini", "armor"}   # they call Google: no attack payloads go there
+
+
 def run(names: list[str]) -> None:
+    live = sorted(LIVE_DETECTORS & set(names))
+    if live:
+        raise SystemExit(f"refused: {', '.join(live)} would send attack payloads to a live Google model; run regex only")
     import injection_check as ic
     detectors = {"regex": ic.regex_check, "gemini": ic.gemini_check, "armor": ic.armor_check}
     items = [json.loads(l) for l in open(SET, encoding="utf-8")]
