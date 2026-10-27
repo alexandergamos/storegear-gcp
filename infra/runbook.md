@@ -325,9 +325,9 @@ gcloud projects add-iam-policy-binding $PROJECT \
 
 # 4. Who may become each account: one GitHub environment each (the job's "environment:" line).
 #    This repo sends GitHub's *immutable* subject (owner and repo with their numeric ids), so the principal is
-#    repo:alexandergamos@330485277/storegear-gcp@1420440664:environment:<env>. Check yours with:
+#    repo:alexandergamos@330485277/storegear-gcp@1435541481:environment:<env>. Check yours with:
 #    gh api repos/$REPO/actions/oidc/customization/sub   (sub_claim_prefix). The plain repo:$REPO form is never sent.
-SUBJECT="repo:alexandergamos@330485277/storegear-gcp@1420440664"
+SUBJECT="repo:alexandergamos@330485277/storegear-gcp@1435541481"   # the repository id changes if the repo is ever recreated: re-bind the three accounts to the new subject
 gcloud iam service-accounts add-iam-policy-binding sg-deploy@$PROJECT.iam.gserviceaccount.com --project=$PROJECT \
   --role=roles/iam.workloadIdentityUser --member="principal://iam.googleapis.com/$POOL/subject/$SUBJECT:environment:production"
 gcloud iam service-accounts add-iam-policy-binding sg-agent@$PROJECT.iam.gserviceaccount.com --project=$PROJECT \
