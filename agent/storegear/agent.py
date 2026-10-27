@@ -143,7 +143,7 @@ def pre_retrieval(callback_context: CallbackContext, llm_request: LlmRequest):
 root_agent = Agent(
     name="storegear",
     # Tail-latency guard (SMO-14): the eu endpoint occasionally queues a call for 30-190 s while the median is
-    # ~2.5 s, and retries on it hit the same overload (27 Oct). So: one attempt with a 6 s timeout, then the
+    # ~2.5 s, and retries on it hit the same overload (27 Oct). So: one attempt with a 10 s timeout (~7 s server cut), then the
     # backup model on europe-west1 with the configured 15 s, still in the EU (fallback.py, ADR-001 addendum).
     model=FallbackGemini(
         model=os.getenv("STOREGEAR_MODEL", "gemini-3.8-flash"),
@@ -151,7 +151,9 @@ root_agent = Agent(
         # Pin the endpoint explicitly: inside Agent Runtime the location env vars may point at the physical region,
         # which doesn't serve gemini-3.8-flash (ADR-001 addendum, ADR-008).
         client_kwargs={"vertexai": True, "location": os.getenv("STOREGEAR_MODEL_LOCATION", "eu")},
-        primary_timeout_ms=int(os.getenv("STOREGEAR_PRIMARY_TIMEOUT_MS", "6000")),
+        # the server gives up about 3 s before the client timeout (15 s -> 504 at ~12 s; 6 s -> 504 at ~3 s, measured
+        # 27 Oct), so 10 s means a ~7 s cut: above every answered call that day outside the overload
+        primary_timeout_ms=int(os.getenv("STOREGEAR_PRIMARY_TIMEOUT_MS", "10000")),
         fallback=Gemini(
             model=os.getenv("STOREGEAR_FALLBACK_MODEL", "gemini-2.5-flash"),
             retry_options=types.HttpRetryOptions(attempts=2, initial_delay=0.5, max_delay=2.0),
