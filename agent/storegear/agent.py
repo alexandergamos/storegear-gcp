@@ -23,7 +23,7 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.tools import ToolContext
 from google.genai import types
 
-from .fallback import FallbackGemini
+from .fallback import FallbackGemini, log
 from .tools.price import lookup_price_stock
 from .tools.models import BRANDS, resolve
 from .tools.search import NO_RESULTS, catalog_registry, format_for_agent, hybrid_search
@@ -69,7 +69,7 @@ def _search(text: str, role: str) -> tuple[str, str]:
     try:
         res = resolve(text, catalog_registry())
     except Exception as e:  # noqa: BLE001  the model list is a refinement: if it can't be read, search as before
-        print(f"[models] registry unavailable, searching unfiltered: {type(e).__name__}")
+        log.warning("[models] registry unavailable, searching unfiltered: %s", type(e).__name__)
         res = None
     if res and res.ambiguous and not res.models:
         return "ambiguous", AMBIGUOUS.format(models=" / ".join(res.ambiguous[0]))
@@ -143,14 +143,15 @@ def pre_retrieval(callback_context: CallbackContext, llm_request: LlmRequest):
 root_agent = Agent(
     name="storegear",
     # Tail-latency guard (SMO-14): the eu endpoint occasionally queues a call for 30-190 s while the median is
-    # ~2.5 s, and retries on it hit the same overload (27 Oct). So: one attempt with a per-call timeout, then the
-    # backup model on europe-west1, still in the EU (fallback.py, ADR-001 addendum).
+    # ~2.5 s, and retries on it hit the same overload (27 Oct). So: one attempt with a 6 s timeout, then the
+    # backup model on europe-west1 with the configured 15 s, still in the EU (fallback.py, ADR-001 addendum).
     model=FallbackGemini(
         model=os.getenv("STOREGEAR_MODEL", "gemini-3.8-flash"),
         retry_options=types.HttpRetryOptions(attempts=1),
         # Pin the endpoint explicitly: inside Agent Runtime the location env vars may point at the physical region,
         # which doesn't serve gemini-3.8-flash (ADR-001 addendum, ADR-008).
         client_kwargs={"vertexai": True, "location": os.getenv("STOREGEAR_MODEL_LOCATION", "eu")},
+        primary_timeout_ms=int(os.getenv("STOREGEAR_PRIMARY_TIMEOUT_MS", "6000")),
         fallback=Gemini(
             model=os.getenv("STOREGEAR_FALLBACK_MODEL", "gemini-2.5-flash"),
             retry_options=types.HttpRetryOptions(attempts=2, initial_delay=0.5, max_delay=2.0),
