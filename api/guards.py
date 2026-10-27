@@ -22,7 +22,10 @@ from google.genai import types
 PROJECT = os.getenv("STOREGEAR_PROJECT_ID", "storegear-prod-ag26")
 ARMOR = os.getenv("STOREGEAR_ARMOR_GUARD", f"projects/{PROJECT}/locations/eu/templates/sg-guard")
 ARMOR_URL = f"https://modelarmor.eu.rep.googleapis.com/v1/{ARMOR}"
-MODEL = os.getenv("STOREGEAR_GUARD_MODEL", "gemini-3.8-flash")
+# the topic check is a yes/no on one short message: a light model with no thinking answers it in ~0.5 s against ~2.5 s on
+# gemini-3.8-flash (eu), still in the EU (ADR-015 addendum, 2026-10-27)
+MODEL = os.getenv("STOREGEAR_GUARD_MODEL", "gemini-2.5-flash")
+MODEL_LOCATION = os.getenv("STOREGEAR_GUARD_LOCATION", "europe-west1")
 ALLOWED_DOMAINS = {"garmin.com", "polar.com", "suunto.com", "support.garmin.com", "support.polar.com"}
 
 # ------------------------------------------------------------------ 1 · PII (deterministic)
@@ -117,11 +120,11 @@ def on_topic(text: str) -> bool:
     global _genai
     with _lock:
         if _genai is None:
-            _genai = genai.Client(vertexai=True, project=PROJECT, location="eu")
+            _genai = genai.Client(vertexai=True, project=PROJECT, location=MODEL_LOCATION)
     r = _genai.models.generate_content(
         model=MODEL, contents=TOPIC_PROMPT.format(text=text.replace("</mensaje>", "")),
         config=types.GenerateContentConfig(temperature=0, response_mime_type="application/json", response_schema=TOPIC_SCHEMA,
-                                           thinking_config=types.ThinkingConfig(thinking_level="low"),
+                                           thinking_config=types.ThinkingConfig(thinking_budget=0),
                                            http_options=types.HttpOptions(timeout=TOPIC_TIMEOUT_MS, retry_options=types.HttpRetryOptions(attempts=1))))
     return bool(json.loads(r.text)["on_topic"])
 

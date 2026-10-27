@@ -59,5 +59,14 @@ In `sg-api`, in this order (blocked requests never reach the agent):
 - **Unchanged:** Model Armor at the door and the output guards (leaks, Model Armor on the answer) still fail closed. A question nobody could screen for safety never reaches the agent.
 - **Accepted:** while the topic check is skipped, an off-topic question costs one agent call and is turned down by the agent instead of the filter.
 
+## Addendum (2026-10-27): a lighter model for the topic check
+- **What we measured:** with warm instances, the "Pregunta revisada" step still took 2.6–6.1 s. Probed one piece at a time with ordinary shop questions:
+  - Model Armor: 0.18 s;
+  - session creation: 0.55 s;
+  - topic check on `gemini-3.8-flash` (`eu`, low thinking): 1.2–3.7 s, median 2.5 s over 12 calls. A thinking budget of 0 barely changed it (2.2 s), and the `minimal` level is not supported.
+- **Decision (Alexander):** the topic check runs on **`gemini-2.5-flash` in `europe-west1` with no thinking**. Median 0.54 s, 18/18 correct on benign shop and off-topic messages (no adversarial traffic to the live model). It is a yes/no on one short message, so a light model is enough. The n8n build already uses a Flash-Lite model for its guards. Processing stays in the EU (ADR-001).
+- **Unchanged:** Model Armor runs first and fails closed. The topic check keeps 8 s and one attempt, and still fails open (addendum of 2026-10-26).
+- **Cost:** the estimate still prices the topic check at the 3.8 Flash rates until the billing export shows the 2.5 Flash SKU, so the cost per answer is slightly overestimated.
+
 ## Revisit when
 More agents or tools sit behind the same door, or the agent is exposed via MCP/A2A (SMO-31) → Agent Gateway with Model Armor centrally; or staff routinely type unstructured personal data → Sensitive Data Protection with custom detectors.

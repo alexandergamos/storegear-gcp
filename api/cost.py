@@ -11,7 +11,8 @@ EUR_PER_TOKEN = {
 }
 EUR_PER_USD = 0.8582
 
-# The topic check (guards.on_topic, one Gemini 3.8 Flash call with low thinking) doesn't report its usage here.
+# The topic check (guards.on_topic, one gemini-2.5-flash call with no thinking since 2026-10-27) doesn't report its usage here.
+# It is still priced at the Gemini 3.8 Flash rates below until the billing export shows the 2.5 Flash SKU: a small overestimate.
 # ~300 tokens in (ADR-015) and a short JSON out; the weekly report shows if this is off.
 TOPIC_CHECK_TOKENS = (300, 20)
 
