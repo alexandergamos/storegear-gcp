@@ -35,3 +35,13 @@ def test_jury_command_creates_a_demo_staff_account_and_keeps_the_password_local(
     users.main(["jury", "jurado@storegear-gcp.test"])
     assert calls == [("jurado@storegear-gcp.test", "staff", True)]
     assert written == {"STOREGEAR_JURY_EMAIL": "jurado@storegear-gcp.test", "STOREGEAR_JURY_PASSWORD": "pw-123"}
+
+
+def test_a_named_jury_account_gets_its_own_keys_and_leaves_the_first_one_alone(monkeypatch):
+    calls, written = [], {}
+    monkeypatch.setattr(users, "session", lambda: "s")
+    monkeypatch.setattr(users, "add", lambda s, email, role, password=None, demo=False: calls.append((email, role, demo)) or ("uid2", "pw-456"))
+    monkeypatch.setattr(users, "write_env", written.update)
+    users.main(["jury", "iraitz@storegear-gcp.test", "iraitz"])
+    assert calls == [("iraitz@storegear-gcp.test", "staff", True)]
+    assert written == {"STOREGEAR_JURY_IRAITZ_EMAIL": "iraitz@storegear-gcp.test", "STOREGEAR_JURY_IRAITZ_PASSWORD": "pw-456"}
