@@ -365,3 +365,43 @@ Bilingual diary (EN + ES), one entry per Linear issue. It feeds the thesis annex
 - **Siguiente:** SMO-27, qué pasa cuando falla el endpoint de Google.
 
 ---
+
+## 22 · Endpoint failures, warm instances, search by model; Phase 4 closed (SMO-27) — 2026-10-27
+
+### EN
+- **What:**
+  - **Warm instances for the jury week** (ADR-008 addendum): `min_instances=1` on Agent Runtime, `--min-instances=1` on `sg-api`. A first "Hola" after a quiet spell went from 79.7 s to about 10 s.
+  - **Search by model** (design `2026-10-27-model-filter`): a deterministic resolver limits the search to the manuals of the models the question names. A partial name that fits several models makes the agent ask. The model list in the prompt comes from the catalogue. The same resolver, ported to JavaScript, runs in the n8n sub-workflow and matches the Python one on 72 cases.
+  - **Backup model** (ADR-001 addendum): one attempt on `gemini-3.8-flash` (`eu`); on a 5xx, 429 or timeout, the same call on `gemini-2.5-flash` in europe-west1. A 4xx other than 429 is raised, never hidden.
+  - **Topic check on a lighter model** (ADR-015 addendum): `gemini-2.5-flash` in europe-west1 with no thinking, median 0.54 s instead of 2.5 s.
+  - The catalogue grew to 22 models (23 manuals, ~31,400 chunks).
+- **Results:**
+  - eval gate 4.95 / 4.91 / 4.95 / 5.00, median 3.7 s (PASS);
+  - the new similar-models set (6 questions) scored 5.00 on every metric;
+  - the n8n eval with the filter matches its baseline: 5.00 / 4.95 / 5.00 / 5.00.
+- **Why:** the jury tests the demo this week. Availability and latency were the open risks, and the new manuals brought near-identical model names.
+- **Learned:**
+  1. **Read the trace before tuning.** The 79.7 s was two cold starts, not the model. The later 50–59 s answers were the model endpoint, not cold starts. The 6 s "check" step was mostly the topic check, not the session (0.55 s).
+  2. **Retries on an overloaded endpoint don't help.** Three 504s in a row; a second endpoint in the same jurisdiction does.
+  3. **A partial name is a trap when the catalogue is incomplete.** "Instinct 3 Solar" matched the only Instinct 3 in the old catalogue, the AMOLED. A partial name with a single candidate now filters nothing.
+  4. **`minimal` thinking isn't available** on Gemini 3.8 Flash, and a thinking budget of 0 barely helped. A lighter model did.
+- **Next:** jury week; the n8n ingestion of the 14 new manuals once LlamaParse credits reset.
+
+### ES
+- **Qué:**
+  - **Instancias siempre en marcha para la semana del jurado** (addendum de ADR-008): `min_instances=1` en Agent Runtime y `--min-instances=1` en `sg-api`. Un primer "Hola" tras un rato sin uso pasó de 79,7 s a unos 10 s.
+  - **Búsqueda por modelo** (diseño `2026-10-27-model-filter`): un resolutor determinista limita la búsqueda a los manuales de los modelos que nombra la pregunta. Si un nombre a medias encaja con varios modelos, el agente pregunta. La lista de modelos del prompt sale del catálogo. El mismo resolutor, en JavaScript, funciona en el subworkflow de n8n y coincide con el de Python en 72 casos.
+  - **Modelo de respaldo** (addendum de ADR-001): un intento con `gemini-3.8-flash` (`eu`); ante un 5xx, un 429 o un timeout, la misma llamada con `gemini-2.5-flash` en europe-west1. Un 4xx que no sea 429 se lanza, nunca se oculta.
+  - **Control de tema con un modelo más ligero** (addendum de ADR-015): `gemini-2.5-flash` en europe-west1 sin razonamiento, con una mediana de 0,54 s en lugar de 2,5 s.
+  - El catálogo creció a 22 modelos (23 manuales, unos 31.400 chunks).
+- **Resultados:**
+  - barrera del eval 4,95 / 4,91 / 4,95 / 5,00, mediana 3,7 s (PASS);
+  - el nuevo juego de modelos parecidos (6 preguntas) saca 5,00 en todas las métricas;
+  - el eval de n8n con el filtro iguala su referencia: 5,00 / 4,95 / 5,00 / 5,00.
+- **Por qué:** el jurado prueba la demo esta semana. La disponibilidad y la latencia eran los riesgos abiertos, y los manuales nuevos traían nombres de modelo casi idénticos.
+- **Aprendido:**
+  1. **Leer la traza antes de ajustar.** Los 79,7 s eran dos arranques en frío, no el modelo. Las respuestas de 50–59 s de después eran el endpoint del modelo, no arranques en frío. Los 6 s del paso de revisión eran sobre todo el control de tema, no la sesión (0,55 s).
+  2. **Reintentar contra un endpoint saturado no ayuda.** Tres 504 seguidos; un segundo endpoint en la misma jurisdicción, sí.
+  3. **Un nombre a medias es una trampa cuando el catálogo está incompleto.** "Instinct 3 Solar" encajaba con el único Instinct 3 del catálogo antiguo, el AMOLED. Ahora un nombre a medias con un solo candidato no filtra nada.
+  4. **El razonamiento `minimal` no existe** en Gemini 3.8 Flash, y un presupuesto de razonamiento de 0 apenas ayudó. Un modelo más ligero, sí.
+- **Siguiente:** semana del jurado; la ingesta en n8n de los 14 manuales nuevos cuando se reinicien los créditos de LlamaParse.

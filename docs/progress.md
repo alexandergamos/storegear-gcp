@@ -134,12 +134,24 @@ We are rebuilding the StoreGear shop assistant, today a working n8n agent, entir
 - **Cost per answer** is priced at what Google actually bills this project (read from the billing export), and a weekly report checks the estimate against the bill.
 - **Still to check:** the first real answers after the redeploy, to confirm traces hold no text and the cost line is right.
 
+### 22. When Google's endpoint fails (SMO-27) — Phase 4 closed
+- **What the employee sees:** if the agent can't answer, a short fixed message instead of an error. The log records why, never the question. Three failed answers in an hour send an email.
+- **Retries that help:** retrying the same overloaded endpoint didn't help (27 Oct: 504s three times in a row, answers of 50 and 59 s, one failure). Now the agent tries Gemini 3.8 Flash once, and on an overload or timeout it repeats the call on Gemini 2.5 Flash in europe-west1. Processing stays in the EU, and every switch is logged.
+- **Cold starts:** a first "Hola" after a quiet spell took 79.7 s, 64 s of them two Agent Runtime cold starts. For the jury week one instance stays warm on Agent Runtime and one on `sg-api` (about $20 a week). The first question after a quiet spell now takes about 10 s.
+- **A faster door:** the topic check moved to a lighter model in the EU, from a median of 2.5 s to 0.54 s per question. Model Armor still checks first.
+- **Proof:** the 22-question gate passes (4.95 / 4.91 / 4.95 / 5.00, median 3.7 s); 11 tests for the fallback, 3 for the topic check.
+
+### 23. A catalogue of 22 watches, searched model by model
+- **What:** the catalogue grew from 9 to 22 models (23 manuals). Several have nearly the same name and different specifications: Instinct 3 Solar, AMOLED, E and Crossover; Forerunner 70, 170, 570 and 970.
+- **The fix:** before searching, a step with no AI finds the models the question names and limits the search to their manuals. A name that fits several ("el Instinct 3") makes the agent ask which one. The model list follows Drive, so a new manual needs no code change. The same resolver runs in n8n.
+- **Proof:** a separate set of 6 similar-model questions scores 5.00 on every metric; the n8n eval with the filter matches its baseline (5.00 / 4.95 / 5.00 / 5.00).
+
 ## What's next
 | Next | Issue | What happens |
 |---|---|---|
-| 1 | SMO-25 / 26 (check) | Confirm on real answers: a trace with no text, an `ANSWER` line with tokens and cost |
-| 2 | SMO-27 | When Google's endpoint fails: retries, a friendly reply instead of an error, an alert, and a decision on a fallback |
-| 3 | Final | n8n vs Google Cloud, side by side, for the delivery PDF |
+| 1 | Final | Jury week: votes on the side-by-side comparison, then the delivery PDF with the final numbers |
+| 2 | n8n | Ingest the 14 new manuals once LlamaParse credits reset (28 Oct), then the similar-models questions on n8n |
+| 3 | After delivery | Warm instances back to 0, budget cap back on (~€50) |
 
 ## Numbers to beat (n8n, 2026-10-11)
 Correctness 5.00 · Faithfulness 4.95 · Context 5.00 · Answer 5.00 · median 9.0 s · ~$0.008 per answer.
