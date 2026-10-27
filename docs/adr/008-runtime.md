@@ -54,6 +54,18 @@ Also: `vertexai.Client` is deprecated in favour of `agentplatform.Client`, which
 - Cold starts hurt real users: set `min_instances=1` and price it.
 - Agent Identity becomes the default for Agent Gateway policies (SMO-23): migrate the grants from `sg-agent`.
 
+## Addendum 2026-10-27: one warm instance for the jury week
+**Measured:** a greeting took 79.7 s in the web demo, and 64 s of it were two cold starts. `create_session` woke a first
+instance (39 s to boot its workers on 1 vCPU), then `stream_query` landed on a second cold instance (25 s). The agent's own
+work was 3.3 s, with Gemini at 1.8 s. The runtime shut the instance down about 4 minutes after the last request.
+
+**Decision:** `min_instances=1` on Agent Runtime and `--min-instances=1` on `sg-api` while the jury tests the demo, then
+back to 0. `infra/deploy_agent_runtime.py` takes `--min-instances`, so the default stays scale-to-zero.
+
+**Cost (list prices checked 2026-10-27):** Agent Runtime bills $0.085 per vCPU-hour and $0.009 per GiB-hour, so a warm
+1 vCPU / 2 GiB instance is at most about $2.5 a day, before the monthly free tier. A warm `sg-api` instance is billed at
+the idle rate, about $0.4 a day. A week costs about $20 in total.
+
 ## Learn more
 - Agent Runtime: https://docs.cloud.google.com/gemini-enterprise-agent-platform/build/runtime
 - Quickstart (ADK): https://docs.cloud.google.com/gemini-enterprise-agent-platform/build/runtime/quickstart-adk
