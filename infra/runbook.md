@@ -168,6 +168,16 @@ uv run python infra/deploy_agent_runtime.py --update   # later (same resource, i
 uv run python infra/ask_remote.py "pregunta"           # test the deployed agent
 ```
 
+### Warm instances for the jury week (2026-10-27; ADR-008 addendum)
+```bash
+uv run python infra/deploy_agent_runtime.py --update --min-instances 1                 # agent: no cold starts
+gcloud run services update sg-api --region europe-west1 --min-instances 1 --project $PROJECT_ID   # API: no cold starts
+# after the jury: back to scale-to-zero
+uv run python infra/deploy_agent_runtime.py --update                                   # min_instances 0
+gcloud run services update sg-api --region europe-west1 --min-instances 0 --project $PROJECT_ID
+```
+`gcloud run deploy` in the deploy workflow keeps the service's min-instances, so a release does not undo it.
+
 ## SMO-16 · Document AI (2026-10-18, Console; ADR-009)
 ```bash
 gcloud services enable documentai.googleapis.com --project $PROJECT_ID

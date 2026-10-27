@@ -2,6 +2,7 @@
 
     uv run python infra/deploy_agent_runtime.py            # first deploy: creates the agent, prints its resource name
     uv run python infra/deploy_agent_runtime.py --update   # later deploys: updates the same agent in place
+    uv run python infra/deploy_agent_runtime.py --update --min-instances 1   # keep one instance warm (jury week)
 
 The resource name is saved in infra/agent_runtime.json (committed; it is an identifier, not a secret).
 """
@@ -60,7 +61,7 @@ def eu_session_service():
                                   agent_engine_id=os.environ["GOOGLE_CLOUD_AGENT_ENGINE_ID"])
 
 
-def main(update: bool) -> None:
+def main(update: bool, min_instances: int = 0) -> None:
     os.chdir(ROOT / "agent")          # so `storegear` is importable and packaged by its folder name
     sys.path.insert(0, str(ROOT / "agent"))
     from storegear.agent import root_agent
@@ -80,7 +81,7 @@ def main(update: bool) -> None:
         "staging_bucket": STAGING,
         "service_account": SA,
         "env_vars": ENV,
-        "min_instances": 0,
+        "min_instances": min_instances,   # 0 = scale to zero; 1 = no cold start (ADR-008 addendum 2026-10-27)
         "max_instances": 2,
         "resource_limits": {"cpu": "1", "memory": "2Gi"},
     }
@@ -97,4 +98,7 @@ def main(update: bool) -> None:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--update", action="store_true")
-    main(ap.parse_args().update)
+    ap.add_argument("--min-instances", type=int, default=0, choices=[0, 1],
+                    help="instances kept warm: 0 = scale to zero (default), 1 = no cold starts")
+    args = ap.parse_args()
+    main(args.update, args.min_instances)
