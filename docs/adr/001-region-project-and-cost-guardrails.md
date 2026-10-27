@@ -72,6 +72,7 @@ Tested with real calls from the project:
 - **Decision (Alexander):** one attempt on `eu`. On a 5xx, 429 or timeout, the same call goes to the alternative kept above: **`gemini-2.5-flash` on `europe-west1`**, with a 512-token thinking budget (2.5 models take a budget, not a level). The backup gets two attempts. Processing stays in the EU. A 4xx other than 429 is raised, never hidden.
 - **Rejected:** `gemini-3.8-flash` on `global`. It gives the same quality but no guarantee that processing stays in the EU.
 - **Cost of the choice:** answers given during an overload come from an older model. The agent logs every switch with a `[model] ... falling back to` line, so the share of backup answers can be counted.
+- **Timeout (same day, after the first live switch):** the primary waited 12 s for a 504 before the switch, and the question took 21.9 s. Answered 3.8 Flash calls that day took a median 2.0 s (p90 3.6 s, 2 of 36 over 6 s, both during the overload), so the primary now gets **6 s** (`STOREGEAR_PRIMARY_TIMEOUT_MS`) and the backup keeps 15 s. The switch is logged with the logger: the first version used `print`, which never reached Agent Runtime's logs.
 - **Code:** `agent/storegear/fallback.py`. The models and locations can be overridden with the env vars `STOREGEAR_FALLBACK_MODEL` and `STOREGEAR_FALLBACK_LOCATION`.
 
 ## Revisit when

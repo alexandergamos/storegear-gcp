@@ -97,3 +97,45 @@ def test_no_fallback_once_the_primary_has_answered_part_of_a_stream(calls):
 def test_without_a_backup_the_error_is_raised(calls):
     with pytest.raises(errors.ServerError):
         run(FallbackGemini(model=PRIMARY))
+
+
+def run_with_timeout(model, timeout_ms=15000):
+    req = LlmRequest(model=PRIMARY, config=types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(thinking_level="low"), http_options=types.HttpOptions(timeout=timeout_ms)))
+
+    async def go():
+        return [r.content.parts[0].text async for r in model.generate_content_async(req)]
+    return asyncio.run(go())
+
+
+@pytest.fixture
+def timeouts(monkeypatch):
+    """Which per-call timeout each model was called with."""
+    seen = []
+
+    async def fake(self, llm_request, stream=False):
+        seen.append((llm_request.model, llm_request.config.http_options.timeout))
+        if llm_request.model == PRIMARY:
+            raise server_error(504)
+        yield LlmResponse(content=types.Content(role="model", parts=[types.Part(text=llm_request.model)]))
+
+    monkeypatch.setattr(Gemini, "generate_content_async", fake)
+    return seen
+
+
+def test_the_primary_gets_a_short_timeout_and_the_backup_a_long_one(timeouts):
+    # 27 Oct: answered 3.8 Flash calls took a median 2.0 s (p90 3.6 s); waiting 12-15 s before switching only adds wait
+    run_with_timeout(FallbackGemini(model=PRIMARY, fallback=Gemini(model=BACKUP), primary_timeout_ms=6000))
+    assert timeouts == [(PRIMARY, 6000), (BACKUP, 15000)]
+
+
+def test_without_a_primary_timeout_the_configured_one_is_kept(timeouts):
+    run_with_timeout(FallbackGemini(model=PRIMARY, fallback=Gemini(model=BACKUP)), timeout_ms=9000)
+    assert timeouts == [(PRIMARY, 9000), (BACKUP, 9000)]
+
+
+def test_the_switch_is_logged_with_both_models(calls, caplog):
+    # a print() never reached Agent Runtime's logs; the logger does
+    with caplog.at_level("WARNING", logger="storegear"):
+        run(model())
+    assert any(PRIMARY in r.getMessage() and BACKUP in r.getMessage() for r in caplog.records)
