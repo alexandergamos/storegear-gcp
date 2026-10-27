@@ -7,7 +7,8 @@ Parity with the n8n Agent Block (ADR-006):
   sections go into the system instruction (not the user message, so memory doesn't grow). The agent searches
   again only if needed. This cut n8n's median latency from 17.5 s to 9 s (D4).
 - Role (staff/manager) is read from session state, set by the verified login (SMO-22). The model can't change it.
-- Model: gemini-3.8-flash on the `eu` endpoint, low thinking (ADR-001 addendum).
+- Model: gemini-3.8-flash on the `eu` endpoint, low thinking (ADR-001 addendum); on overload, gemini-2.5-flash on
+  europe-west1 (fallback.py).
 """
 from __future__ import annotations
 
@@ -22,6 +23,7 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.tools import ToolContext
 from google.genai import types
 
+from .fallback import FallbackGemini
 from .tools.price import lookup_price_stock
 from .tools.models import BRANDS, resolve
 from .tools.search import NO_RESULTS, catalog_registry, format_for_agent, hybrid_search
@@ -141,13 +143,19 @@ def pre_retrieval(callback_context: CallbackContext, llm_request: LlmRequest):
 root_agent = Agent(
     name="storegear",
     # Tail-latency guard (SMO-14): the eu endpoint occasionally queues a call for 30-190 s while the median is
-    # ~2.5 s. A per-call timeout plus retry ("hedging") re-sends slow calls, which usually land on free capacity.
-    model=Gemini(
+    # ~2.5 s, and retries on it hit the same overload (27 Oct). So: one attempt with a per-call timeout, then the
+    # backup model on europe-west1, still in the EU (fallback.py, ADR-001 addendum).
+    model=FallbackGemini(
         model=os.getenv("STOREGEAR_MODEL", "gemini-3.8-flash"),
-        retry_options=types.HttpRetryOptions(attempts=3, initial_delay=0.5, max_delay=2.0),
+        retry_options=types.HttpRetryOptions(attempts=1),
         # Pin the endpoint explicitly: inside Agent Runtime the location env vars may point at the physical region,
         # which doesn't serve gemini-3.8-flash (ADR-001 addendum, ADR-008).
         client_kwargs={"vertexai": True, "location": os.getenv("STOREGEAR_MODEL_LOCATION", "eu")},
+        fallback=Gemini(
+            model=os.getenv("STOREGEAR_FALLBACK_MODEL", "gemini-2.5-flash"),
+            retry_options=types.HttpRetryOptions(attempts=2, initial_delay=0.5, max_delay=2.0),
+            client_kwargs={"vertexai": True, "location": os.getenv("STOREGEAR_FALLBACK_LOCATION", "europe-west1")},
+        ),
     ),
     description="Asistente de tienda: especificaciones de smartwatches y precio/stock en vivo.",
     instruction=PROMPT,
