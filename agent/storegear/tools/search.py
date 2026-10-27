@@ -29,6 +29,8 @@ from google.auth import impersonated_credentials
 from google.cloud.sql.connector import Connector
 from google.genai import types
 
+from .models import Registry
+
 # Project ID (not number): Agent Runtime sets GOOGLE_CLOUD_PROJECT to the project NUMBER, and Cloud SQL
 # connection names require the ID ("The Cloud SQL instance does not exist" otherwise).
 PROJECT = os.getenv("STOREGEAR_PROJECT_ID", "storegear-prod-ag26")
@@ -46,11 +48,14 @@ SCOPES = ["https://www.googleapis.com/auth/sqlservice.login", "https://www.googl
 
 HYBRID_SQL = """
 WITH params AS (
-  SELECT CAST(:qv AS vector) AS qv, CAST(:qt AS text) AS qt, CAST(:k AS int) AS k, CAST(:role AS text) AS role
+  SELECT CAST(:qv AS vector) AS qv, CAST(:qt AS text) AS qt, CAST(:k AS int) AS k, CAST(:role AS text) AS role,
+         CAST(:files AS text[]) AS files
 ),
 allowed AS (
   SELECT c.* FROM catalog_chunks c, params p
-   WHERE c.access_level = 'staff' OR (p.role = 'manager' AND c.access_level = 'manager')
+   WHERE (c.access_level = 'staff' OR (p.role = 'manager' AND c.access_level = 'manager'))
+     -- a named model: only its manuals (manager-only documents name no model and stay in)
+     AND (p.files IS NULL OR c.file_name = ANY(p.files) OR c.access_level = 'manager')
 ),
 dense AS (
   SELECT a.child_id, a.parent_id, row_number() OVER (ORDER BY a.embedding <=> p.qv) AS r
@@ -118,6 +123,9 @@ NO_RESULTS = "No se encontraron chunks relevantes en el catalogo para esta consu
 _TAG = re.compile(r"</?manual[^>]*>", re.IGNORECASE)
 
 _lock = threading.Lock()
+_registry: tuple[float, Registry] | None = None
+REGISTRY_TTL = 600   # s: a manual added in Drive becomes a model within 10 minutes of its ingestion
+MODELS_SQL = "SELECT DISTINCT file_name FROM catalog_chunks WHERE access_level = 'staff' AND file_id <> 'polar-common'"
 _engine: sqlalchemy.Engine | None = None
 _genai: genai.Client | None = None
 
@@ -164,13 +172,25 @@ def embed_query(text: str) -> list[float]:
     return r.embeddings[0].values
 
 
-def hybrid_search(query: str, role: str = "staff", top_n: int = RETURN_N) -> list[dict]:
-    """Raw ranked parents (for evals and debugging). `role` comes from the verified login, never from the model."""
+def catalog_registry() -> Registry:
+    """The catalog's models, from the staff manuals' names (the same list as the web demo's /catalog/models)."""
+    global _registry
+    if _registry is None or time.time() - _registry[0] > REGISTRY_TTL:
+        with engine().connect() as conn:
+            sql = MODELS_SQL.replace("catalog_chunks", f"catalog_chunks{CATALOG_SUFFIX}")
+            names = [r[0] for r in conn.execute(sqlalchemy.text(sql)).fetchall()]
+        _registry = (time.time(), Registry.from_files(names))
+    return _registry[1]
+
+
+def hybrid_search(query: str, role: str = "staff", top_n: int = RETURN_N, files: list[str] | None = None) -> list[dict]:
+    """Raw ranked parents (for evals and debugging). `role` comes from the verified login, never from the model.
+    `files` restricts the search to those manuals (the models the text names); None searches the whole catalog."""
     role = role if role in ("staff", "manager") else "staff"
     qv = "[" + ",".join(f"{x:.7f}" for x in embed_query(query)) + "]"
     with engine().connect() as conn:
         sql = HYBRID_SQL.replace("catalog_chunks", f"catalog_chunks{CATALOG_SUFFIX}").replace("catalog_parents", f"catalog_parents{CATALOG_SUFFIX}")
-        rows = conn.execute(sqlalchemy.text(sql), {"qv": qv, "qt": query, "k": FETCH_K, "role": role}).mappings().all()
+        rows = conn.execute(sqlalchemy.text(sql), {"qv": qv, "qt": query, "k": FETCH_K, "role": role, "files": files}).mappings().all()
     return diversify([dict(r) for r in rows], top_n)
 
 
