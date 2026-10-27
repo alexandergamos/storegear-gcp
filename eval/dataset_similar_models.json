@@ -1,0 +1,50 @@
+[
+ {
+  "qid": 101,
+  "category": "spec",
+  "manual": "Instinct_3_Solar_OM_ES-XM.pdf",
+  "question": "¿Cuánto dura la batería del Garmin Instinct 3 Solar de 45 mm en modo smartwatch?",
+  "expected_answer": "Hasta 28 días con un uso normal, e ilimitada con carga solar.",
+  "source": "Información del dispositivo > Información sobre la autonomía de la batería (p. 96)"
+ },
+ {
+  "qid": 102,
+  "category": "spec",
+  "manual": "Instinct_3_AMOLED_OM_ES-XM.pdf",
+  "question": "¿Cuánto dura la batería del Garmin Instinct 3 AMOLED de 45 mm en modo smartwatch?",
+  "expected_answer": "Hasta 18 días con Movimiento de muñeca y hasta 7 días con la pantalla siempre encendida.",
+  "source": "Información del dispositivo > Información sobre la autonomía de la batería (p. 99)"
+ },
+ {
+  "qid": 103,
+  "category": "comparison",
+  "manual": "Forerunner_570_OM_ES-XM.pdf + Forerunner_970_OM_ES-XM.pdf",
+  "question": "En modo solo GPS, ¿qué aguanta más: el Forerunner 570 de 47 mm o el Forerunner 970?",
+  "expected_answer": "El Forerunner 970: hasta 26 horas en modo GNSS solo GPS, frente a hasta 18 horas del Forerunner 570 de 47 mm.",
+  "source": "Forerunner 570, Información sobre la autonomía de la batería (p. 111); Forerunner 970, ídem (p. 131)"
+ },
+ {
+  "qid": 104,
+  "category": "spec",
+  "manual": "Forerunner_570_OM_ES-XM.pdf",
+  "question": "¿Cuánto almacenamiento para música tiene el Garmin Forerunner 570?",
+  "expected_answer": "Hasta 8 GB de almacenamiento multimedia.",
+  "source": "Información del dispositivo > Especificaciones (p. 110)"
+ },
+ {
+  "qid": 105,
+  "category": "comparison",
+  "manual": "Instinct_E_OM_ES-XM.pdf + Instinct_Crossover_AMOLED_OM_ES-XM.pdf",
+  "question": "En modo smartwatch, ¿qué dura más: el Instinct E de 45 mm o el Instinct Crossover AMOLED?",
+  "expected_answer": "El Instinct E de 45 mm: hasta 16 días, frente a hasta 14 días del Instinct Crossover AMOLED con Movimiento de muñeca (hasta 5 días con la pantalla siempre encendida).",
+  "source": "Instinct E, Información sobre la autonomía de la batería (p. 72); Instinct Crossover AMOLED, ídem (p. 100)"
+ },
+ {
+  "qid": 106,
+  "category": "ambiguous",
+  "manual": "",
+  "question": "¿Cuánto dura la batería del Instinct 3 en modo solo GPS?",
+  "expected_answer": "Debe preguntar a qué modelo se refiere, Instinct 3 AMOLED o Instinct 3 Solar (sus autonomías son distintas), sin dar cifras todavía.",
+  "source": "Regla 7 (ambigüedad)"
+ }
+]

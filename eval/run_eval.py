@@ -169,9 +169,9 @@ def build_context(run: dict, question: str) -> str:
     return "\n\n".join(parts)[:80000] or "(vacio: el asistente no hizo ninguna busqueda)"
 
 
-def main(only: list[int], out_path: str | None = None) -> None:
+def main(only: list[int], out_path: str | None = None, dataset: str = "dataset.json") -> None:
     corr_prompt, triad_prompt = load_prompt("correctness.md"), load_prompt("rag_triad.md")
-    qs = json.load(open(ROOT / "eval" / "dataset.json", encoding="utf-8"))
+    qs = json.load(open(ROOT / "eval" / dataset, encoding="utf-8"))
     if only:
         qs = [q for q in qs if q["qid"] in only]
     results = []
@@ -213,6 +213,7 @@ if __name__ == "__main__":
     ap.add_argument("--only", type=int, nargs="*", default=[])
     ap.add_argument("--remote", action="store_true", help="evaluate the agent deployed on Agent Runtime")
     ap.add_argument("--out", help="where to write the results JSON (the CI gate reads it, SMO-28)")
+    ap.add_argument("--dataset", default="dataset.json", help="eval/<file>: the 22 questions, or dataset_similar_models.json")
     args = ap.parse_args()
     if args.remote:
         import warnings
@@ -221,4 +222,4 @@ if __name__ == "__main__":
         st = json.loads((ROOT / "infra" / "agent_runtime.json").read_text())
         REMOTE = vertexai.Client(project="storegear-prod-ag26", location=st["location"]).agent_engines.get(name=st["resource_name"])
         print("evaluating DEPLOYED agent:", st["resource_name"])
-    main(args.only, args.out)
+    main(args.only, args.out, args.dataset)

@@ -16,7 +16,17 @@ STAFF_FILES = {
 }
 
 
-@pytest.mark.parametrize("file_name,expected", [*STAFF_FILES.items(), ("Foo_Bar_OM_ES-XM.pdf", "Foo Bar")])
+NEW_FILES = {   # added 2026-10-27; the agent's resolver (agent/storegear/tools/models.py) names them the same way
+    "Instinct_3_Solar_OM_ES-XM.pdf": "Garmin Instinct 3 Solar",
+    "vivoactive_6_OM_ES-XM.pdf": "Garmin vivoactive 6",
+    "fenix_8_Series_OM_ES-XM.pdf": "Garmin fenix 8",
+    "Forerunner_170_Series_OM_ES-XM.pdf": "Garmin Forerunner 170",
+    "Suunto_Race_2_UserGuide_EN.pdf": "Suunto Race 2",
+    "Suunto_Race_2_UserGuide_ES.pdf": "Suunto Race 2",
+}
+
+
+@pytest.mark.parametrize("file_name,expected", [*STAFF_FILES.items(), *NEW_FILES.items(), ("Foo_Bar_OM_ES-XM.pdf", "Foo Bar")])
 def test_display_name(file_name, expected):
     assert catalog.display_name(file_name) == expected
 

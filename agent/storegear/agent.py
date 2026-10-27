@@ -23,7 +23,8 @@ from google.adk.tools import ToolContext
 from google.genai import types
 
 from .tools.price import lookup_price_stock
-from .tools.search import format_for_agent, hybrid_search
+from .tools.models import BRANDS, resolve
+from .tools.search import NO_RESULTS, catalog_registry, format_for_agent, hybrid_search
 
 PROMPT = (Path(__file__).parent / "prompts" / "system_es.md").read_text(encoding="utf-8")
 
@@ -39,6 +40,43 @@ COMO USARLA:
 - CIFRAS DE ESPECIFICACIONES (impermeabilidad, bateria, dimensiones, temperaturas, peso): si la cifra concreta que se pregunta no aparece en estos resultados, busca "<modelo> especificaciones tecnicas <dato>" antes de responder. No respondas "consulta el dispositivo" sin haber buscado la ficha tecnica.
 - Para precio o stock usa "consultar_precio_stock" con el fileId de estos resultados (regla 2).
 - Las reglas 7 (ambiguedad), 9 y 10 se aplican igual: si la pregunta es ambigua, pregunta primero aunque haya resultados."""
+
+
+AMBIGUOUS = """El mensaje nombra un modelo que encaja con varios del catalogo: {models}. NO busques ni respondas todavia: pregunta al empleado a cual de ellos se refiere."""
+
+AMBIGUOUS_PRE = """
+
+BUSQUEDA PREVIA AUTOMATICA: no se ha buscado. {message} Aplica la regla 7 (ambiguedad)."""
+
+
+def model_list_block() -> str:
+    """The catalog's models by brand, from the manuals in the catalog (a manual added in Drive appears here)."""
+    by_brand: dict[str, list[str]] = {}
+    for name in catalog_registry().models:
+        brand, _, rest = name.partition(" ")
+        if brand.lower() not in BRANDS:
+            brand, rest = "Otros", name
+        by_brand.setdefault(brand, []).append(rest)
+    lines = [f"- {b}: {', '.join(sorted(v, key=str.lower))}" for b, v in sorted(by_brand.items())]
+    return "\n\nMODELOS EN EL CATALOGO (un manual por modelo):\n" + "\n".join(lines)
+
+
+def _search(text: str, role: str) -> tuple[str, str]:
+    """One search for the pre-retrieval and the tool: filtered by the models the text names (design 2026-10-27).
+    Returns ("ambiguous" | "results" | "empty", text for the model)."""
+    try:
+        res = resolve(text, catalog_registry())
+    except Exception as e:  # noqa: BLE001  the model list is a refinement: if it can't be read, search as before
+        print(f"[models] registry unavailable, searching unfiltered: {type(e).__name__}")
+        res = None
+    if res and res.ambiguous and not res.models:
+        return "ambiguous", AMBIGUOUS.format(models=" / ".join(res.ambiguous[0]))
+    rows = hybrid_search(text, role=role, files=res.files if res else None)
+    return ("results" if rows else "empty"), format_for_agent(rows)
+
+
+def search_step(text: str, role: str) -> str:
+    return _search(text, role)[1]
 
 
 # Pre-retrieval block per invocation, kept in process memory so evals can show the judge what the model saw
@@ -61,7 +99,7 @@ def buscar_catalogo_hibrido(query: str, tool_context: ToolContext) -> str:
         query: La consulta de busqueda en lenguaje natural, con el nombre completo del modelo.
     """
     tool_context.state["temp:searches"] = tool_context.state.get("temp:searches", 0) + 1
-    return format_for_agent(hybrid_search(query, role=_role(tool_context.state)))
+    return search_step(query, _role(tool_context.state))
 
 
 def consultar_precio_stock(file_id: str) -> dict:
@@ -86,14 +124,17 @@ def pre_retrieval(callback_context: CallbackContext, llm_request: LlmRequest):
         text = ""
         if callback_context.user_content and callback_context.user_content.parts:
             text = " ".join(p.text or "" for p in callback_context.user_content.parts).strip()
-        rows = hybrid_search(text, role=_role(state)) if text else []
-        block = PRE_RETRIEVAL.format(results=format_for_agent(rows)) if rows else ""
+        kind, found = _search(text, _role(state)) if text else ("empty", NO_RESULTS)
+        block = {"results": PRE_RETRIEVAL.format(results=found), "ambiguous": AMBIGUOUS_PRE.format(message=found)}.get(kind, "")
         state[key] = block
         LAST_PRE[callback_context.invocation_id] = block
         while len(LAST_PRE) > 200:
             LAST_PRE.pop(next(iter(LAST_PRE)))
-    if block:
-        llm_request.append_instructions([block])
+    try:
+        models = model_list_block()
+    except Exception:  # noqa: BLE001
+        models = ""
+    llm_request.append_instructions([b for b in (models, block) if b])
     return None
 
 

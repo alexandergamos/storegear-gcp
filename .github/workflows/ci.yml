@@ -21,4 +21,4 @@ jobs:
       - name: Install (the same versions as uv.lock)
         run: uv sync --frozen
       - name: Unit tests (sg-api, infra, eval gate)
-        run: uv run pytest api/tests infra/tests eval/tests -q
+        run: uv run pytest api/tests infra/tests eval/tests agent/tests -q
