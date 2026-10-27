@@ -5,8 +5,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const UPDATED = '2026-10-24';
-const HEADLINE = 'Phase 4: keyless CI/CD, traces without text, cost per answer, dashboard + alert · next: endpoint failures (SMO-27)';
+const UPDATED = '2026-10-27';
+const HEADLINE = 'Phase 4 closed: endpoint failures handled (backup model in the EU), 22-model catalogue with search by model · next: jury week';
 
 // ---------------------------------------------------------------- content (edit statuses here)
 const LAPTOP = [
@@ -65,8 +65,8 @@ const PHASES = [
   ['done', 'Phase 1 · Working agent', '17-18 Oct'],
   ['done', 'Phase 2 · Ingestion', '19-21 Oct'],
   ['done', 'Phase 3 · Safety', '21-22 Oct'],
-  ['wip', 'Phase 4 · Ops', '22-29 Oct'],
-  ['todo', 'Final · n8n vs GCP', '30-31 Oct'],
+  ['done', 'Phase 4 · Ops', '22-29 Oct'],
+  ['wip', 'Final · n8n vs GCP', '30-31 Oct'],
 ];
 
 // ---------------------------------------------------------------- styling

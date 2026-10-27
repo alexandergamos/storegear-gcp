@@ -51,6 +51,8 @@ Correctness misses the gate by 0.04, from **Q6 only** (Ignite 2 water resistance
 
 **Quality: 22/22 answers at 5 when the model responds.** The remaining risk is **availability**: the `eu` endpoint's tail latency can still outlast 3 × 15 s. Handled in Phase 4 (SMO-27): a friendly fallback reply, the dead-letter queue, and possibly a smarter retry policy (longer last attempt, or a non-EU fallback only with Alexander's approval).
 
+**Update (2026-10-27, SMO-27):** handled with a fixed friendly reply, an email alert at 3 failed answers in an hour, and a backup model that stays in the EU: one attempt on `gemini-3.8-flash` (`eu`), then `gemini-2.5-flash` in europe-west1 (ADR-001 addendum). No non-EU fallback. Failed answers are not queued for a retry: each one is logged with its reason, never the question.
+
 ## Consequences
 - **Good:** quality parity with n8n and 30 % faster median. A repeatable, scripted gate is ready for CI (SMO-28).
 - **Bad / accepted:** the guidance deviates slightly from n8n's text, recorded here. LLM judges have variance: one question can move ±1 between runs. n8n duplicated Q10/Q16 (as Q21/Q22) for that reason.

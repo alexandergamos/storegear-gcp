@@ -78,7 +78,7 @@ Simon Willison's "lethal trifecta": an agent is exploitable for data theft when 
 | **LLM07 System Prompt Leakage** | The prompt could be extracted | **Accepted:** the prompt holds no secrets, keys or access rules; access control lives in SQL and IAM, not in the prompt (the n8n lesson: "telling the LLM not to show it is not security") · ⏳ Output check for prompt-leak patterns (SMO-23) |
 | **LLM08 Vector and Embedding Weaknesses** | Staff and manager data in the same tables | ✅ Access filter applied **inside the search SQL** on `access_level`, before ranking · ✅ The agent's DB user can only read · Accepted: embedding inversion is not a meaningful risk for public manuals; the internal document is protected by the filter, not by embedding secrecy |
 | **LLM09 Misinformation** | Wrong specs or prices → lost sales | ✅ Answers grounded in retrieved sections, with the source cited · ✅ "No lo sé" for products outside the catalog (eval Q19) · ✅ Prices only from the sheet · ✅ 22-question eval gate at every phase · ⏳ Eval in CI before every deploy (SMO-28) |
-| **LLM10 Unbounded Consumption** | Anyone flooding the agent; runaway retries | ✅ Budget with cap (ADR-001) · ✅ Agent Runtime max 2 instances · ✅ Model timeout 15 s × 3 attempts · ✅ Ingestion: 3 attempts then dead · ⏳ Authentication + rate limiting per user (SMO-22) · ⏳ Cost per answer + alerts (SMO-26, SMO-27) |
+| **LLM10 Unbounded Consumption** | Anyone flooding the agent; runaway retries | ✅ Budget alerts (ADR-001; the hard cap returns after the jury week, ~€50) · ✅ Agent Runtime max 2 instances · ✅ Model timeout 15 s, one attempt, then the backup model with 2 attempts · ✅ Ingestion: 3 attempts then dead · ✅ Authentication + rate limiting per user (SMO-22) · ✅ Cost per answer + alerts (SMO-26, SMO-27) |
 
 ## 7. OWASP Top 10 for Agentic Applications (Dec 2025) → our design
 
@@ -91,7 +91,7 @@ Simon Willison's "lethal trifecta": an agent is exploitable for data theft when 
 | ASI05 Unexpected Code Execution | **No**: no code-execution tool | Accepted (N/A); would need a sandbox + ADR if ever added |
 | ASI06 Memory & Context Poisoning | Partly: sessions keep conversation history | ✅ Sessions are per user; no shared long-term memory (Memory Bank not enabled) · ⏳ Retention 30 days (SMO-24) · Rule: enabling Memory Bank needs per-user scoping and a review |
 | ASI07 Insecure Inter-Agent Communication | **No**: single agent | Accepted (N/A) until SMO-31 (MCP/A2A exposure, backlog) |
-| ASI08 Cascading Failures | Partly | ✅ Bounded retries everywhere, dead letter + alert for ingestion · ⏳ Friendly failure reply + alert for the agent (SMO-27) |
+| ASI08 Cascading Failures | Partly | ✅ Bounded retries everywhere, dead letter + alert for ingestion · ✅ Friendly failure reply + alert for the agent · ✅ backup model in the EU when the `eu` endpoint is overloaded (SMO-27) |
 | ASI09 Human-Agent Trust Exploitation | Yes: staff may over-trust answers | ✅ Source cited in every answer · ✅ "No lo sé" instead of guessing · Accepted: final responsibility for a sale stays with the employee |
 | ASI10 Rogue Agents | **No**: no autonomy beyond a single request | Accepted (N/A) |
 
