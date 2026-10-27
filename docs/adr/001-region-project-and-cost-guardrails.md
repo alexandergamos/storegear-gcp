@@ -67,6 +67,13 @@ Tested with real calls from the project:
 - **Alternative kept:** `gemini-2.5-flash` on `europe-west1` (strictest residency, older model).
 - **Open for SMO-11:** the embedding model. `gemini-embedding-2` showed up on `global`; check `eu` / `europe-west1` before re-embedding.
 
+## Addendum (2026-10-27): backup model on overload
+- **What happened:** on 27 Oct the `eu` endpoint of `gemini-3.8-flash` answered 504 after ~12 s several times in a row. With min instances on, two questions still took 50 s and 59 s, and one of them failed. The retries went to the same endpoint and hit the same overload.
+- **Decision (Alexander):** one attempt on `eu`. On a 5xx, 429 or timeout, the same call goes to the alternative kept above: **`gemini-2.5-flash` on `europe-west1`**, with a 512-token thinking budget (2.5 models take a budget, not a level). The backup gets two attempts. Processing stays in the EU. A 4xx other than 429 is raised, never hidden.
+- **Rejected:** `gemini-3.8-flash` on `global`. It gives the same quality but no guarantee that processing stays in the EU.
+- **Cost of the choice:** answers given during an overload come from an older model. The agent logs every switch with a `[model] ... falling back to` line, so the share of backup answers can be counted.
+- **Code:** `agent/storegear/fallback.py`. The models and locations can be overridden with the env vars `STOREGEAR_FALLBACK_MODEL` and `STOREGEAR_FALLBACK_LOCATION`.
+
 ## Revisit when
 - A second person or a real customer uses the agent: split dev and prod projects and drop the hard cap in favour of alerts plus on-call.
 - A required model is missing in europe-west1.
